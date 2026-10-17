@@ -30,9 +30,13 @@ anywhere: your numbers stay in the browser.
 | **Price compare** | Two prices by metre, yard or fat quarter, at two widths | Price per square metre or yard, which is cheaper, what the project costs on each |
 | **Yardage estimate** | Piece sizes and counts, fabric width, waste | Fabric to buy for a pattern with no envelope figure |
 | **Needle and thread** | The fabric's name or type | Needle type and size, thread, stitch length, overlocker settings and a tip, from sheers to leather |
+| **Pressing and interfacing** | A fibre or fabric | Iron setting, steam, press cloth, the interfacing to use and a tip |
+| **Seam finishes** | A fabric | The best finish, the alternatives, the hem |
+| **Burn test** | What a burning snippet did and smelt of | The fibre, with what each fibre does for comparison |
+| **People** | Stash's Measurements.csv, or a name and measurements typed in | A list of the people you sew for; every calculator with a body measurement gets a "fill from" choice |
 
-The calculators are grouped as Cutting, Fitting, Buying and Machine: a list
-down the side on a desk-sized screen, a dropdown on a phone.
+The calculators are grouped as Cutting, Fitting, Buying, Reference and
+People: a list down the side on a desk-sized screen, a dropdown on a phone.
 
 Lengths take fractions (`1 1/2`, `5/8`, `⅝`) and unit suffixes (`45"`, `2 yd`,
 `1.2 m`, `250 mm`) whichever unit is switched on. Long lengths (seams, spools,
@@ -57,6 +61,8 @@ npm test            # the maths, with vitest
 npm run typecheck
 npm run dev         # live at http://localhost:5173
 npm run build       # dist/index.html, one self-contained file
+npm run smoke       # after a build: clicks through every calculator in a headless browser
+                    # (once: npx playwright install chromium)
 ```
 
 Layout: `src/calc/` is the arithmetic, one module per calculator, plain

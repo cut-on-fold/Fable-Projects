@@ -18,9 +18,9 @@ like to know:
    project that is not here, that is the next one to add.
 3. **Metric or imperial by default?** Stash keeps fabric in metric and
    measurements in inches, so Thimble starts in cm and remembers the toggle.
-4. **Serger / overlocker?** Toldi Lock thread in the stash suggests one. A
-   differential-feed and tension cheat sheet by fabric would be a natural
-   addition to Needle and thread.
+4. **Serger / overlocker?** Toldi Lock thread in the stash suggests one, so
+   Needle and thread now carries overlocker stitch, length and differential
+   feed by fabric. Tensions are left out: tell me the model and they can go in.
 5. **Does anything here overlap with what you are planning in Stash?** Stretch
    percentage and yardage conversion could belong in Stash's pattern ↔ fabric
    matching. The maths in `thimble/src/calc` is plain TypeScript with no
@@ -53,6 +53,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Thimble v0.4.0** — People: read Stash's Measurements.csv (or type
+      someone in) and fill the body fields of Circle skirt, Elastic, Waistbands,
+      Stretch and ease and Cup size and FBA from a name. Reference group:
+      Pressing and interfacing by fibre, Seam finishes by fabric, Burn test by
+      what you saw. A browser smoke test in the repo, run by CI.
 - [x] **Bolt End v0.1.0** — shelf labels, swatch cards and hang tags from a
       Stash CSV export: six Avery layouts plus cards and tags, choose the lines,
       filter by status or a word, start part way down a used sheet, print at

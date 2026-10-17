@@ -26,6 +26,15 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - name: Browser smoke test
+        if: matrix.project == 'thimble'
+        run: npx playwright install --with-deps chromium && npm run smoke
+      - uses: actions/upload-artifact@v4
+        if: matrix.project == 'thimble' && always()
+        with:
+          name: thimble-smoke-shots
+          path: thimble/smoke-shots
+          if-no-files-found: ignore
 
   calibration:
     runs-on: ubuntu-latest

@@ -6,6 +6,9 @@ import { waistband } from './calc/waistband';
 import { EASE_RANGES, sleeveCap } from './calc/sleeve';
 import { DRAFTED_FOR, bustAdjustment, cupSize } from './calc/bust';
 import { parsePieces, yardage } from './calc/yardage';
+import { searchPressing } from './calc/pressing';
+import { searchFinishes } from './calc/finishes';
+import { searchBurn } from './calc/burn';
 import { CM_PER_IN, formatBuy, formatLength, formatPercent, fromUnit } from './units';
 import { SA, WIDTH, bool, num, pct, str, type Output, type Tool, type Values } from './framework';
 
@@ -119,7 +122,7 @@ export const MORE_TOOLS: Tool[] = [
     blurb: 'Cut length and width for a straight woven waistband or cuff, the interfacing, and where the seams fall along it.',
     fields: [
       { key: 'band', kind: 'select', label: 'Band', default: 'waist', options: [{ value: 'waist', label: 'Waistband' }, { value: 'cuff', label: 'Cuff' }, { value: 'plain', label: 'Band that meets edge to edge' }], sets: (id, unit): Values => (id === 'waist' ? { underlap: fromUnit(unit === 'in' ? 1.25 : 3, unit), finishedWidth: fromUnit(unit === 'in' ? 1.5 : 4, unit) } : id === 'cuff' ? { underlap: fromUnit(unit === 'in' ? 1 : 2.5, unit), finishedWidth: fromUnit(unit === 'in' ? 2.5 : 6, unit) } : { underlap: 0 }) },
-      { key: 'body', kind: 'length', label: 'Waist or wrist', default: { cm: 80, in: 31.5 }, hint: 'Where the band sits, over any garment underneath.' },
+      { key: 'body', kind: 'length', label: 'Waist or wrist', default: { cm: 80, in: 31.5 }, hint: 'Where the band sits, over any garment underneath.', person: 'Waist' },
       { key: 'ease', kind: 'length', label: 'Ease', default: { cm: 2, in: 0.75 } },
       { key: 'underlap', kind: 'length', label: 'Underlap for the button or hook', default: { cm: 3, in: 1.25 } },
       { key: 'finishedWidth', kind: 'length', label: 'Finished width', default: { cm: 4, in: 1.5 } },
@@ -183,8 +186,8 @@ export const MORE_TOOLS: Tool[] = [
     group: 'Fitting',
     blurb: 'Sewing cup size from the high bust and full bust, which size to cut, and how much full or small bust adjustment the pattern needs.',
     fields: [
-      { key: 'high', kind: 'length', label: 'High bust', default: { cm: 90, in: 35.5 }, hint: 'Under the arms, above the bust, tape snug.' },
-      { key: 'full', kind: 'length', label: 'Full bust', default: { cm: 100, in: 39.5 }, hint: 'Over the fullest part, wearing the bra you will wear with it.' },
+      { key: 'high', kind: 'length', label: 'High bust', default: { cm: 90, in: 35.5 }, hint: 'Under the arms, above the bust, tape snug.', person: 'High bust' },
+      { key: 'full', kind: 'length', label: 'Full bust', default: { cm: 100, in: 39.5 }, hint: 'Over the fullest part, wearing the bra you will wear with it.', person: 'Full bust / chest' },
       { key: 'drafted', kind: 'select', label: 'The pattern is drafted for a', default: 'B', options: DRAFTED_FOR.map((d) => ({ value: d.id, label: d.name })), wide: true, hint: 'Most patterns draft for a B cup. Cup-sized ranges say which cup each piece is.' },
     ],
     compute(v, unit) {
@@ -234,5 +237,59 @@ export const MORE_TOOLS: Tool[] = [
       if (parsed.bad.length) out.rows!.push({ label: 'Could not read', value: parsed.bad.join('; ') });
       return out;
     },
+  },
+  {
+    id: 'pressing',
+    name: 'Pressing and interfacing',
+    group: 'Reference',
+    blurb: 'Iron setting, steam, press cloth and the interfacing to reach for, by fibre. On a blend, go by the most delicate fibre.',
+    fields: [{ key: 'q', kind: 'text', label: 'Fibre or fabric', default: '', placeholder: 'silk, linen, ponte, polyester…', wide: true }],
+    compute(v) {
+      const hits = searchPressing(str(v, 'q'));
+      if (!hits.length) return { empty: 'Nothing matches. Try the fibre (cotton, wool, polyester) rather than the fabric\u2019s name.' };
+      return {
+        cards: hits.map((e) => ({ title: e.fibre, subtitle: e.examples, pairs: [['Iron', e.iron], ['Steam', e.steam], ['Press cloth', e.cloth], ['Interfacing', e.interfacing]], tip: e.tip })),
+        notes: ['Dots on the dial: • about 110 °C, •• about 150 °C, ••• about 200 °C. Fuse interfacing with a press cloth, a dry iron held still for 10–15 seconds, then steam; let it cool flat before moving it.'],
+      };
+    },
+  },
+  {
+    id: 'finishes',
+    name: 'Seam finishes',
+    group: 'Reference',
+    blurb: 'Which seam finish and hem suit the fabric.',
+    fields: [{ key: 'q', kind: 'text', label: 'Fabric', default: '', placeholder: 'chiffon, linen, denim, jersey…', wide: true }],
+    compute(v) {
+      const hits = searchFinishes(str(v, 'q'));
+      if (!hits.length) return { empty: 'Nothing matches. Try the fabric\u2019s type: sheer, light, medium, heavy, knit.' };
+      return {
+        cards: hits.map((e) => ({ title: e.fabric, subtitle: e.examples, pairs: [['Best', e.best], ['Also', e.also], ['Hem', e.hem]], tip: e.tip })),
+        notes: ['A French seam needs 1.5 cm of allowance; a flat-felled seam 1.5–2 cm; an overlocked seam any width, trimmed by the knife.'],
+      };
+    },
+  },
+  {
+    id: 'burn',
+    name: 'Burn test',
+    group: 'Reference',
+    blurb: 'Name a mystery fabric from how a snippet burns. Type what you saw and smelt.',
+    fields: [{ key: 'q', kind: 'text', label: 'What happened', default: '', placeholder: 'melts, hard bead, vinegar, burning hair, soft ash…', wide: true }],
+    compute(v) {
+      const hits = searchBurn(str(v, 'q'));
+      if (!hits.length) return { empty: 'Nothing matches those words. Try one at a time: ash, bead, melts, hair, paper, sweet, vinegar, celery.' };
+      return {
+        cards: hits.map((e) => ({ title: e.fibre, subtitle: e.approach, pairs: [['Burning', e.burning], ['Smell', e.smell], ['Left behind', e.residue]], tip: e.fibre === 'A blend' ? 'Pull a thread from each direction and burn them separately: warp and weft can be different fibres.' : 'Snip a 2 cm piece, hold it in tweezers over the sink, and bring the flame to it from the side.' })),
+        notes: ['Natural fibres leave ash; synthetics leave a bead. Cellulose smells of paper, protein of hair. Do this over a sink, with a lid to hand.'],
+      };
+    },
+  },
+  {
+    id: 'people',
+    name: 'People',
+    group: 'People',
+    blurb: 'Measurements for the people you sew for, so the calculators can fill their body fields from a name. Read from Stash\u2019s Measurements.csv or typed in; kept in this browser only.',
+    fields: [],
+    custom: true,
+    compute: () => ({}),
   },
 ];

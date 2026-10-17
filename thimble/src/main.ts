@@ -1,6 +1,7 @@
 import './styles.css';
 import { GROUPS, TOOLS, resolveDefault, type Field, type Output, type Tool, type Values } from './tools';
-import { inputText, parseLength, parseNumber, unitLabel, type Unit } from './units';
+import { formatLength, inputText, parseLength, parseNumber, unitLabel, type Unit } from './units';
+import { BODY_FIELDS, mergePeople, peopleFromCsv, type Person } from './people';
 
 const STORAGE_KEY = 'thimble.v1';
 
@@ -8,10 +9,11 @@ interface State {
   unit: Unit;
   tool: string;
   values: Record<string, Values>;
+  people: Person[];
 }
 
 function load(): State {
-  const fallback: State = { unit: 'cm', tool: TOOLS[0]!.id, values: {} };
+  const fallback: State = { unit: 'cm', tool: TOOLS[0]!.id, values: {}, people: [] };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -20,6 +22,7 @@ function load(): State {
       unit: parsed.unit === 'in' ? 'in' : 'cm',
       tool: TOOLS.some((t) => t.id === parsed.tool) ? (parsed.tool as string) : fallback.tool,
       values: typeof parsed.values === 'object' && parsed.values ? parsed.values : {},
+      people: Array.isArray(parsed.people) ? parsed.people.filter((p) => p && typeof p.name === 'string' && p.measures) : [],
     };
   } catch {
     return fallback;
@@ -143,6 +146,7 @@ function render(): void {
 }
 
 function renderTool(tool: Tool): HTMLElement {
+  if (tool.custom) return renderPeople(tool);
   const values = valuesFor(tool);
   const head = el('div', { class: 'tool-head' }, el('h2', { id: `tool-${tool.id}`, tabindex: '-1' }, tool.name), el('p', {}, tool.blurb));
   const form = el('form', { class: 'form', autocomplete: 'off' });
@@ -185,6 +189,27 @@ function renderTool(tool: Tool): HTMLElement {
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
     else fallback();
   });
+
+  const bodyFields = tool.fields.filter((f) => f.person);
+  if (bodyFields.length && state.people.length) {
+    const sel = el('select', { id: `${tool.id}-person` });
+    sel.append(el('option', { value: '' }, 'Type them in'));
+    for (const p of state.people) sel.append(el('option', { value: p.name }, p.name));
+    sel.addEventListener('change', () => {
+      const p = state.people.find((x) => x.name === sel.value);
+      if (!p) return;
+      for (const f of bodyFields) {
+        const cm = p.measures[f.person!];
+        if (cm === undefined) continue;
+        values[f.key] = cm;
+        const target = inputs.get(f.key);
+        if (target) target.value = inputText(cm, state.unit, f.kind === 'length' ? f.long : false);
+      }
+      refresh();
+    });
+    form.append(el('div', { class: 'field wide' }, el('label', { for: `${tool.id}-person` }, 'Fill the body measurements from'), el('div', { class: 'control' }, sel),
+      el('span', { class: 'hint' }, `Fills ${bodyFields.map((f) => f.label.toLowerCase()).join(', ')} from the People page.`)));
+  }
 
   for (const f of tool.fields) {
     const id = `${tool.id}-${f.key}`;
@@ -270,6 +295,91 @@ function renderTool(tool: Tool): HTMLElement {
 
   refresh();
   return el('div', { class: 'tool' }, head, form, results);
+}
+
+function renderPeople(tool: Tool): HTMLElement {
+  const head = el('div', { class: 'tool-head' }, el('h2', { id: `tool-${tool.id}`, tabindex: '-1' }, tool.name), el('p', {}, tool.blurb));
+  const wrap = el('div', { class: 'people' });
+
+  // import
+  const file = el('input', { type: 'file', id: 'people-file', accept: '.csv,text/csv' });
+  file.addEventListener('change', () => {
+    const f = file.files?.[0];
+    if (!f) return;
+    f.text().then((text) => {
+      const found = peopleFromCsv(text);
+      if (!found.length) {
+        status.textContent = 'No people with measurements in that file. It wants Stash\u2019s Measurements.csv, with a Name column.';
+        return;
+      }
+      state.people = mergePeople(state.people, found);
+      save(state);
+      render();
+    });
+  });
+  const status = el('span', { class: 'hint', id: 'people-status' }, 'In Stash: Backups & export \u2192 Export everything, then choose Measurements.csv. People marked Archived are skipped; a name already here is replaced.');
+  wrap.append(el('div', { class: 'field wide' }, el('span', { class: 'label-text' }, 'Read from Stash'),
+    el('div', { class: 'file' }, el('label', { class: 'btn', for: 'people-file' }, 'Choose Measurements.csv\u2026'), file), status));
+
+  // list
+  if (state.people.length) {
+    const table = el('table');
+    const tr = el('tr', {}, el('th', {}, 'Name'));
+    for (const b of BODY_FIELDS) tr.append(el('th', { class: 'num' }, b.label));
+    tr.append(el('th', {}, ''));
+    table.append(el('thead', {}, tr));
+    const tbody = el('tbody');
+    for (const p of state.people) {
+      const row = el('tr', {}, el('td', {}, p.name));
+      for (const b of BODY_FIELDS) {
+        const cm = p.measures[b.column];
+        row.append(el('td', { class: 'num' }, cm === undefined ? '\u2013' : formatLength(cm, state.unit)));
+      }
+      const rm = el('button', { type: 'button', class: 'link', id: `remove-${p.name}` }, 'Remove');
+      rm.addEventListener('click', () => {
+        state.people = state.people.filter((x) => x !== p);
+        save(state);
+        render();
+      });
+      row.append(el('td', {}, rm));
+      tbody.append(row);
+    }
+    table.append(tbody);
+    wrap.append(el('div', { class: 'table-wrap' }, table));
+  } else wrap.append(el('p', { class: 'empty' }, 'Nobody yet.'));
+
+  // add by hand
+  const form = el('form', { class: 'form', autocomplete: 'off' });
+  const name = el('input', { type: 'text', id: 'person-name', placeholder: 'Mum' });
+  form.append(el('div', { class: 'field' }, el('label', { for: 'person-name' }, 'Name'), el('div', { class: 'control' }, name)));
+  const boxes = new Map<string, HTMLInputElement>();
+  for (const b of BODY_FIELDS) {
+    const input = el('input', { type: 'text', id: `person-${b.column}`, inputmode: 'decimal' });
+    input.dataset.unit = state.unit;
+    boxes.set(b.column, input);
+    form.append(el('div', { class: 'field' }, el('label', { for: `person-${b.column}` }, b.label), el('div', { class: 'control' }, input, el('span', { class: 'suffix' }, state.unit))));
+  }
+  const add = el('button', { type: 'submit', class: 'copy', id: 'person-add' }, 'Add or replace');
+  form.append(el('div', { class: 'field' }, el('span', { class: 'label-text' }, '\u00a0'), el('div', {}, add)));
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const n = name.value.trim();
+    if (!n) {
+      name.focus();
+      return;
+    }
+    const measures: Record<string, number> = {};
+    for (const [col, box] of boxes) {
+      const cm = parseLength(box.value, state.unit);
+      if (cm !== null && cm > 0) measures[col] = cm;
+    }
+    state.people = mergePeople(state.people, [{ name: n, measures }]);
+    save(state);
+    render();
+  });
+  wrap.append(el('h3', { class: 'sub' }, 'Or type someone in'), form);
+  wrap.append(el('ul', { class: 'notes' }, el('li', {}, 'Circle skirt, Elastic, Waistbands, Stretch and ease, and Cup size and FBA get a \u201cFill the body measurements from\u201d choice once someone is here.')));
+  return el('div', { class: 'tool' }, head, wrap);
 }
 
 /** What a field shows, as text, for the copied summary. */

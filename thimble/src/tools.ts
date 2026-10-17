@@ -80,7 +80,7 @@ const BASE_TOOLS: Tool[] = [
     name: 'Circle skirt',
     blurb: 'Waist radius, hem radius, hem length and the fabric a circle skirt takes, from a full circle to a quarter.',
     fields: [
-      { key: 'waist', kind: 'length', label: 'Waist', default: { cm: 76, in: 30 }, hint: 'Where the skirt sits. Use the hip if it has to pull on.' },
+      { key: 'waist', kind: 'length', label: 'Waist', default: { cm: 76, in: 30 }, hint: 'Where the skirt sits. Use the hip if it has to pull on.', person: 'Waist' },
       { key: 'ease', kind: 'length', label: 'Ease', default: { cm: 2, in: 0.75 }, hint: 'Added to the waist. 0 for a bias-cut waist that will stretch.' },
       { key: 'fraction', kind: 'select', label: 'Circle', default: '1', options: [{ value: '2', label: 'Double circle' }, { value: '1', label: 'Full circle' }, { value: '0.75', label: 'Three-quarter circle' }, { value: '0.5', label: 'Half circle' }, { value: '0.25', label: 'Quarter circle' }] },
       { key: 'length', kind: 'length', label: 'Skirt length', default: { cm: 60, in: 24 }, hint: 'Finished, waist seam to hem.' },
@@ -211,7 +211,7 @@ const BASE_TOOLS: Tool[] = [
     blurb: 'How long to cut elastic for a waist, leg or neckline, by the kind of elastic.',
     fields: [
       { key: 'kind', kind: 'select', label: 'Elastic', default: 'knitted', options: ELASTIC_KINDS.map((k) => ({ value: k.id, label: k.name })), sets: (id) => ({ reduction: (ELASTIC_KINDS.find((k) => k.id === id)?.reduction ?? 0.08) * 100 }), wide: true },
-      { key: 'body', kind: 'length', label: 'Body measurement', default: { cm: 80, in: 31.5 }, hint: 'Waist, leg opening, or the seam line of a neckline.' },
+      { key: 'body', kind: 'length', label: 'Body measurement', default: { cm: 80, in: 31.5 }, hint: 'Waist, leg opening, or the seam line of a neckline.', person: 'Waist' },
       { key: 'reduction', kind: 'percent', label: 'Take off', default: 8 },
       { key: 'overlap', kind: 'length', label: 'Overlap for the join', default: { cm: 2.5, in: 1 } },
     ],
@@ -351,7 +351,7 @@ const BASE_TOOLS: Tool[] = [
       { key: 'marked', kind: 'length', label: 'Marked on the fold', default: { cm: 10, in: 4 }, hint: 'Fold the fabric across the greatest stretch and mark this much.' },
       { key: 'stretched', kind: 'length', label: 'Stretched to', default: { cm: 15, in: 6 }, hint: 'Stretched comfortably, not to its limit.' },
       { key: 'needs', kind: 'percent', label: 'The pattern needs', default: 50, hint: 'Optional: the stretch the pattern asks for.' },
-      { key: 'body', kind: 'length', label: 'Body measurement', default: { cm: 90, in: 36 } },
+      { key: 'body', kind: 'length', label: 'Body measurement', default: { cm: 90, in: 36 }, person: 'Full bust / chest' },
       { key: 'ease', kind: 'percent', label: 'Negative ease', default: 10 },
       { key: 'finished', kind: 'length', label: 'Finished garment measurement', default: null, hint: 'Optional: the pattern’s finished measurement, to see its ease on you.' },
     ],
@@ -457,7 +457,7 @@ const BASE_TOOLS: Tool[] = [
   },
   {
     id: 'needles',
-    group: 'Machine',
+    group: 'Reference',
     name: 'Needle and thread',
     blurb: 'A starting needle, thread, stitch and overlocker setting for the fabric on the table. Test on a scrap of the same layers.',
     fields: [{ key: 'q', kind: 'text', label: 'Fabric', default: '', placeholder: 'ponte, chiffon, denim, swim…', wide: true }],

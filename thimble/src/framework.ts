@@ -15,6 +15,8 @@ interface FieldBase {
   hint?: string;
   wide?: boolean;
   showIf?: (v: Values) => boolean;
+  /** The Stash measurement column this body field can be filled from ("Waist", "High bust" …). */
+  person?: string;
 }
 export type Field =
   | (FieldBase & { kind: 'length'; default: UnitDefault | null; /** typed and shown in metres or yards */ long?: boolean })
@@ -37,8 +39,8 @@ export interface Output {
   empty?: string;
 }
 
-export type Group = 'Cutting' | 'Fitting' | 'Buying' | 'Machine';
-export const GROUPS: Group[] = ['Cutting', 'Fitting', 'Buying', 'Machine'];
+export type Group = 'Cutting' | 'Fitting' | 'Buying' | 'Reference' | 'People';
+export const GROUPS: Group[] = ['Cutting', 'Fitting', 'Buying', 'Reference', 'People'];
 
 export interface Tool {
   id: string;
@@ -47,6 +49,8 @@ export interface Tool {
   blurb: string;
   fields: Field[];
   compute: (v: Values, unit: Unit) => Output;
+  /** A tool with its own page instead of a form: main.ts calls this with the container. */
+  custom?: true;
 }
 
 export function resolveDefault(d: UnitDefault | null, unit: Unit): number | null {
