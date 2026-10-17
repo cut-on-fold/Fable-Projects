@@ -40,8 +40,12 @@ const SUFFIXES: Array<[RegExp, number]> = [
   [/(ft|feet|foot|'|′)$/i, 12 * CM_PER_IN],
 ];
 
-/** Parse a length typed in `unit`, honouring an explicit suffix if there is one. Returns cm. */
-export function parseLength(text: string, unit: Unit): number | null {
+/**
+ * Parse a length typed in `unit`, honouring an explicit suffix if there is one.
+ * A `long` field takes bare numbers as metres or yards instead of cm or inches.
+ * Returns cm.
+ */
+export function parseLength(text: string, unit: Unit, long = false): number | null {
   const s = text.trim();
   for (const [re, factor] of SUFFIXES) {
     const m = re.exec(s);
@@ -52,7 +56,13 @@ export function parseLength(text: string, unit: Unit): number | null {
   }
   const n = parseNumber(s);
   if (n === null) return null;
+  if (long) return unit === 'in' ? n * 36 * CM_PER_IN : n * 100;
   return unit === 'in' ? n * CM_PER_IN : n;
+}
+
+/** The unit label a length box shows. */
+export function unitLabel(unit: Unit, long = false): string {
+  return long ? (unit === 'in' ? 'yd' : 'm') : unit;
 }
 
 export function toUnit(cm: number, unit: Unit): number {
@@ -126,8 +136,9 @@ export function formatPercent(fraction: number, decimals = 0): string {
 }
 
 /** The value to show in an input box for a stored cm value, in the current unit. */
-export function inputText(cm: number | null, unit: Unit): string {
+export function inputText(cm: number | null, unit: Unit, long = false): string {
   if (cm === null || !Number.isFinite(cm)) return '';
+  if (long) return unit === 'in' ? formatFraction(cm / CM_PER_IN / 36, 8) : trimZeros((cm / 100).toFixed(2));
   if (unit === 'in') return formatFraction(cm / CM_PER_IN, 16);
   return trimZeros(cm.toFixed(2));
 }

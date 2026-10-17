@@ -64,3 +64,14 @@ describe('formatting', () => {
     expect(inputText(null, 'cm')).toBe('');
   });
 });
+
+describe('long lengths', () => {
+  it('bare numbers in a long field are metres or yards', () => {
+    expect(parseLength('2.5', 'cm', true)).toBe(250);
+    expect(parseLength('2', 'in', true)).toBeCloseTo(182.88);
+    expect(parseLength('250 cm', 'cm', true)).toBe(250);
+    expect(inputText(250, 'cm', true)).toBe('2.5');
+    expect(inputText(182.88, 'in', true)).toBe('2');
+    expect(inputText(2.54 * 36 * 1.125, 'in', true)).toBe('1 1/8');
+  });
+});

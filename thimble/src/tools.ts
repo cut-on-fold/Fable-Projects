@@ -10,6 +10,8 @@ import { convertWidth, widthChart } from './calc/width';
 import { lengthToBuy, shrinkage } from './calc/shrinkage';
 import { easeFromFinished, stretchBand, stretchPercent, withNegativeEase } from './calc/stretch';
 import { searchNeedles } from './calc/needles';
+import { STITCH_KINDS, TYPICAL_SEAMS, threadNeeded } from './calc/thread';
+import { allowanceChange, finishedFromFlat } from './calc/allowance';
 import { CM_PER_IN, formatBuy, formatLength, formatPercent, type Unit } from './units';
 
 export type Value = number | string | boolean | null;
@@ -26,7 +28,7 @@ interface FieldBase {
   showIf?: (v: Values) => boolean;
 }
 export type Field =
-  | (FieldBase & { kind: 'length'; default: UnitDefault | null })
+  | (FieldBase & { kind: 'length'; default: UnitDefault | null; /** typed and shown in metres or yards */ long?: boolean })
   | (FieldBase & { kind: 'number'; default: number | null; suffix?: string })
   | (FieldBase & { kind: 'percent'; default: number | null })
   | (FieldBase & { kind: 'int'; default: number | null })
@@ -79,7 +81,7 @@ export const TOOLS: Tool[] = [
     blurb: 'How much continuous bias a square or offcut gives, how big a square to cut for a length you need, and the strip width for a binding.',
     fields: [
       { key: 'strip', kind: 'length', label: 'Strip width', default: { cm: 4, in: 1.5 }, hint: 'The cut width of each bias strip.' },
-      { key: 'wanted', kind: 'length', label: 'Bias wanted', default: null, hint: 'Leave blank if you are starting from a piece of fabric.' },
+      { key: 'wanted', kind: 'length', long: true, label: 'Bias wanted', default: null, hint: 'Leave blank if you are starting from a piece of fabric.' },
       { key: 'w', kind: 'length', label: 'Piece width', default: { cm: 45, in: 18 } },
       { key: 'h', kind: 'length', label: 'Piece height', default: { cm: 45, in: 18 } },
       { key: 'finished', kind: 'length', label: 'Finished binding width', default: { cm: 1.2, in: 0.5 }, hint: 'The width you see once the binding is sewn.' },
@@ -331,7 +333,7 @@ export const TOOLS: Tool[] = [
     name: 'Fabric width',
     blurb: 'The pattern asks for a length at one width and the bolt is another. Rounded up to the next 10 cm or eighth of a yard.',
     fields: [
-      { key: 'length', kind: 'length', label: 'Length the pattern asks for', default: { cm: 200, in: 80 } },
+      { key: 'length', kind: 'length', long: true, label: 'Length the pattern asks for', default: { cm: 200, in: 80 } },
       { key: 'from', kind: 'length', label: 'At this width', default: WIDTH_NARROW },
       { key: 'to', kind: 'length', label: 'Your fabric is', default: WIDTH },
     ],
@@ -359,7 +361,7 @@ export const TOOLS: Tool[] = [
       { key: 'lenAfter', kind: 'length', label: 'Swatch length after', default: { cm: 19.2, in: 7.75 } },
       { key: 'widBefore', kind: 'length', label: 'Swatch width before', default: { cm: 20, in: 8 }, hint: 'Across the grain.' },
       { key: 'widAfter', kind: 'length', label: 'Swatch width after', default: { cm: 19.8, in: 7.875 } },
-      { key: 'needed', kind: 'length', label: 'Length the pattern needs', default: { cm: 200, in: 80 } },
+      { key: 'needed', kind: 'length', long: true, label: 'Length the pattern needs', default: { cm: 200, in: 80 } },
       { key: 'width', kind: 'length', label: 'Fabric width', default: WIDTH },
     ],
     compute(v, unit) {
@@ -430,15 +432,81 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    id: 'allowance',
+    name: 'Seam allowances',
+    blurb: 'What to trim or add when you sew at a different allowance from the pattern, and the finished measurement of a pattern piece measured flat.',
+    fields: [
+      { key: 'pattern', kind: 'length', label: 'The pattern’s allowance', default: SA },
+      { key: 'sewing', kind: 'length', label: 'You sew at', default: SA_NARROW },
+      { key: 'measured', kind: 'length', label: 'Piece measured flat', default: { cm: 25, in: 10 }, hint: 'Edge to edge at the bust, waist or hip line, skipping darts and pleats.' },
+      { key: 'allowances', kind: 'int', label: 'Allowances in that measurement', default: 1, hint: '1 for a piece on the fold, 2 for a piece with a seam each side.' },
+      { key: 'times', kind: 'number', label: 'Times round the body', default: 4, suffix: '×', hint: '4 for a half front; 2 for a full front, or a half front plus a matching back.' },
+      { key: 'body', kind: 'length', label: 'Body measurement', default: null, hint: 'Optional, to see the ease.' },
+    ],
+    compute(v, unit) {
+      const pattern = num(v, 'pattern');
+      const sewing = num(v, 'sewing');
+      const L = (cm: number) => formatLength(cm, unit);
+      const out: Output = { rows: [], notes: [] };
+      if (pattern !== null && sewing !== null) {
+        const c = allowanceChange(pattern, sewing);
+        if (c) {
+          const d = Math.abs(c.change);
+          out.headline = d < 1e-9
+            ? { label: 'Allowances match', value: L(sewing), note: 'Nothing to trim or add.' }
+            : c.change < 0
+              ? { label: 'Trim off every edge', value: L(d), note: `The pattern has ${L(pattern)}; you sew at ${L(sewing)}. Or leave the piece and sew ${L(d)} further in.` }
+              : { label: 'Add to every edge', value: L(d), note: `The pattern has ${L(pattern)}; you sew at ${L(sewing)}.` };
+        }
+      }
+      const measured = num(v, 'measured');
+      if (measured !== null && pattern !== null) {
+        const r = finishedFromFlat(measured, pattern, num(v, 'allowances') ?? 0, num(v, 'times') ?? 1, num(v, 'body'));
+        if (r) {
+          out.rows!.push({ label: 'Finished garment measurement', value: L(r.finished), sub: 'Allowances taken off, then times round the body.' });
+          if (r.ease !== null) out.rows!.push({ label: r.ease >= 0 ? 'Ease' : 'Negative ease', value: L(Math.abs(r.ease)) });
+        } else out.warn = 'The allowances are more than the measurement.';
+      }
+      out.notes!.push('Hems and foldlines carry no seam allowance in the count: a piece on the fold crosses one allowance, not two.');
+      if (!out.headline && !out.rows!.length) return { empty: 'Give the two allowances.' };
+      return out;
+    },
+  },
+  {
+    id: 'thread',
+    name: 'Thread',
+    blurb: 'How much thread the seams of a project use, by stitch, and whether the spool will last.',
+    fields: [
+      { key: 'seams', kind: 'length', long: true, label: 'Seams to sew', default: { cm: 1000, in: 11 * 36 }, hint: TYPICAL_SEAMS.map((t) => `${t.name} ${t.length / 100} m`).join(', ') + '.' },
+      { key: 'stitch', kind: 'select', label: 'Stitch', default: 'lock', options: STITCH_KINDS.map((k) => ({ value: k.id, label: k.name })), sets: (id) => ({ spool: id === 'lock' || id === 'zigzag' ? 100000 : 250000 }), hint: 'Changing the stitch resets the spool to a 1000 m reel or a 2500 m cone.' },
+      { key: 'waste', kind: 'percent', label: 'Add for tails and unpicking', default: 15 },
+      { key: 'spool', kind: 'length', long: true, label: 'Thread on a spool', default: { cm: 100000, in: 1094 * 36 }, hint: 'Sew-all spools are 100 m, 250 m or 1000 m; overlocker cones 2500 m or 3000 m.' },
+    ],
+    compute(v, unit) {
+      const seams = num(v, 'seams');
+      const kind = STITCH_KINDS.find((k) => k.id === str(v, 'stitch')) ?? STITCH_KINDS[0]!;
+      const waste = pct(v, 'waste') ?? 0;
+      if (seams === null) return { empty: 'Give the length of the seams.' };
+      const r = threadNeeded(seams, kind, waste, num(v, 'spool') ?? 0);
+      if (!r) return { empty: 'Check the numbers.' };
+      const L = (cm: number) => formatLength(cm, unit, { long: true });
+      return {
+        headline: { label: 'Thread, all threads together', value: L(r.total), note: `${kind.ratio}× the seam length${waste ? `, plus ${formatPercent(waste)}` : ''}` },
+        table: { head: ['Thread', 'Length', 'Spools'], numeric: [false, true, true], rows: r.perThread.map((p) => [{ text: p.name }, { text: L(p.length) }, { text: p.spools ? `${p.spools}` : '–' }]) },
+        notes: ['Thread-maker ratios for medium fabric at an ordinary stitch length. Thick seams, short stitches and wide overlock stitches use more; the spool to watch is the looper.'],
+      };
+    },
+  },
+  {
     id: 'needles',
     name: 'Needle and thread',
-    blurb: 'A starting needle, thread and stitch for the fabric on the table. Test on a scrap of the same layers.',
+    blurb: 'A starting needle, thread, stitch and overlocker setting for the fabric on the table. Test on a scrap of the same layers.',
     fields: [{ key: 'q', kind: 'text', label: 'Fabric', default: '', placeholder: 'ponte, chiffon, denim, swim…', wide: true }],
     compute(v) {
       const hits = searchNeedles(str(v, 'q'));
       if (!hits.length) return { empty: 'Nothing matches. Try the fabric’s type (knit, woven, sheer) instead of its name.' };
       return {
-        cards: hits.map((e) => ({ title: e.fabric, subtitle: e.examples, pairs: [['Needle', `${e.needle} ${e.size}`], ['Thread', e.thread], ['Stitch', e.stitch]], tip: e.tip })),
+        cards: hits.map((e) => ({ title: e.fabric, subtitle: e.examples, pairs: [['Needle', `${e.needle} ${e.size}`], ['Thread', e.thread], ['Stitch', e.stitch], ['Overlocker', e.overlock]], tip: e.tip })),
         notes: ['Needle sizes are European/American: 80/12. Change the needle every project or eight hours of sewing; a dull one skips and snags before it breaks.'],
       };
     },

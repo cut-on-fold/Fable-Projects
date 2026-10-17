@@ -202,6 +202,20 @@ a { color: var(--accent); }
   min-width: 0;
 }
 .results .empty { color: var(--muted); }
+.results-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: -4px; }
+.results-bar span { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.copy {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.copy:hover { background: var(--accent-soft); }
+.results-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .headline { display: flex; flex-direction: column; gap: 2px; }
 .headline .label { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .headline .value {

@@ -21,11 +21,21 @@ anywhere: your numbers stay in the browser.
 | **Fabric width** | Length at the pattern's width, your fabric's width | Length to buy, rounded up to 10 cm or ⅛ yd, with a chart of common widths |
 | **Shrinkage** | A swatch measured before and after washing, the length the pattern needs | Shrinkage along and across the grain, length to buy, width after washing |
 | **Stretch and ease** | A marked fold stretched, the stretch the pattern wants, body measurement, negative ease | Stretch percentage and what that fabric suits, whether it meets the pattern, finished measurements |
-| **Needle and thread** | The fabric's name or type | Needle type and size, thread, stitch length and a tip, from sheers to leather |
+| **Seam allowances** | The pattern's allowance and yours; a piece measured flat | What to trim or add to every edge; the finished garment measurement and its ease |
+| **Thread** | Total seam length, stitch type, spool size | Thread used, split by needle and looper, and how many spools |
+| **Needle and thread** | The fabric's name or type | Needle type and size, thread, stitch length, overlocker settings and a tip, from sheers to leather |
 
 Lengths take fractions (`1 1/2`, `5/8`, `⅝`) and unit suffixes (`45"`, `2 yd`,
-`1.2 m`, `250 mm`) whichever unit is switched on. Inches come out in eighths
+`1.2 m`, `250 mm`) whichever unit is switched on. Long lengths (seams, spools,
+fabric to buy) are typed in metres or yards. Inches come out in eighths
 (sixteenths under an inch); buying lengths in metres or yards.
+
+**Copy** on the results card puts that calculator's inputs and results on the
+clipboard as plain text, for a project's notes in Stash.
+
+**On a phone:** open the published page in Safari or Chrome and add it to the
+home screen. It installs as an app and opens with no connection; it updates
+itself the next time it is opened online.
 
 ## Develop
 
@@ -43,7 +53,9 @@ npm run build       # dist/index.html, one self-contained file
 Layout: `src/calc/` is the arithmetic, one module per calculator, plain
 functions over centimetres and unit-tested in `tests/`. `src/units.ts`
 parses and formats lengths. `src/tools.ts` describes each calculator as
-fields in and rows out, and `src/main.ts` draws them.
+fields in and rows out, and `src/main.ts` draws them. `public/` holds the
+manifest and icons; `sw.template.js` becomes `dist/sw.js` at build time with
+the version written in, so each release replaces the offline copy.
 
 ## Publishing
 

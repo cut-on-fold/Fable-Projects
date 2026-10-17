@@ -1,6 +1,6 @@
 import './styles.css';
 import { TOOLS, resolveDefault, type Field, type Output, type Tool, type Values } from './tools';
-import { inputText, parseLength, parseNumber, type Unit } from './units';
+import { inputText, parseLength, parseNumber, unitLabel, type Unit } from './units';
 
 const STORAGE_KEY = 'thimble.v1';
 
@@ -125,7 +125,7 @@ function render(): void {
   const app = el('div', { class: 'app' }, header, el('div', { class: 'body' }, nav, panel),
     el('footer', { class: 'footer' },
       el('p', {}, 'Lengths take fractions (1 1/2, 5/8) and unit suffixes (45", 2 yd, 1.2 m). Your numbers stay in this browser.'),
-      el('p', {}, 'Rules of thumb are starting points: test on a scrap.')));
+      el('p', {}, `Rules of thumb are starting points: test on a scrap. Thimble ${__THIMBLE_VERSION__}.`)));
   root.append(app);
 }
 
@@ -134,18 +134,44 @@ function renderTool(tool: Tool): HTMLElement {
   const head = el('div', { class: 'tool-head' }, el('h2', { id: `tool-${tool.id}`, tabindex: '-1' }, tool.name), el('p', {}, tool.blurb));
   const form = el('form', { class: 'form', autocomplete: 'off' });
   form.addEventListener('submit', (e) => e.preventDefault());
-  const results = el('section', { class: 'results', 'aria-live': 'polite', 'aria-label': 'Results' });
+  const body = el('div', { class: 'results-body', 'aria-live': 'polite' });
+  const copy = el('button', { type: 'button', class: 'copy', id: `copy-${tool.id}` }, 'Copy');
+  const results = el('section', { class: 'results', 'aria-label': 'Results' },
+    el('div', { class: 'results-bar' }, el('span', {}, 'Results'), copy), body);
   const wrappers = new Map<string, HTMLElement>();
   const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
+  let latest: Output = {};
 
   const refresh = () => {
     for (const f of tool.fields) {
       const w = wrappers.get(f.key);
       if (w) w.hidden = f.showIf ? !f.showIf(values) : false;
     }
-    renderOutput(results, tool.compute(values, state.unit));
+    latest = tool.compute(values, state.unit);
+    renderOutput(body, latest);
+    copy.hidden = !!latest.empty;
     save(state);
   };
+
+  copy.addEventListener('click', () => {
+    const text = describe(tool, values, latest, state.unit);
+    const done = () => {
+      copy.textContent = 'Copied';
+      setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+    };
+    const fallback = () => {
+      const ta = el('textarea', { 'aria-hidden': 'true' });
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.append(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch { copy.textContent = 'Select and copy'; }
+      ta.remove();
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  });
 
   for (const f of tool.fields) {
     const id = `${tool.id}-${f.key}`;
@@ -162,7 +188,8 @@ function renderTool(tool: Tool): HTMLElement {
           for (const [k, val] of Object.entries(f.sets(select.value))) {
             values[k] = val;
             const target = inputs.get(k);
-            if (target) target.value = typeof val === 'number' ? String(val) : String(val ?? '');
+            const tf = tool.fields.find((x) => x.key === k);
+            if (target) target.value = typeof val === 'number' ? (tf?.kind === 'length' ? inputText(val, state.unit, tf.long) : String(val)) : String(val ?? '');
           }
         }
         refresh();
@@ -189,14 +216,14 @@ function renderTool(tool: Tool): HTMLElement {
       wrapper.append(label, el('div', { class: 'control' }, input));
     } else {
       const input = el('input', { type: 'text', id, inputmode: 'decimal' });
-      const suffix = f.kind === 'length' ? state.unit : f.kind === 'percent' ? '%' : f.kind === 'number' && f.suffix ? f.suffix : '';
+      const suffix = f.kind === 'length' ? unitLabel(state.unit, f.long) : f.kind === 'percent' ? '%' : f.kind === 'number' && f.suffix ? f.suffix : '';
       if (f.kind === 'length') input.dataset.unit = state.unit;
       const cur = values[f.key];
-      if (typeof cur === 'number') input.value = f.kind === 'length' ? inputText(cur, state.unit) : String(cur);
+      if (typeof cur === 'number') input.value = f.kind === 'length' ? inputText(cur, state.unit, f.long) : String(cur);
       input.addEventListener('input', () => {
         const text = input.value;
         let parsed: number | null;
-        if (f.kind === 'length') parsed = parseLength(text, state.unit);
+        if (f.kind === 'length') parsed = parseLength(text, state.unit, f.long);
         else if (f.kind === 'int') {
           const n = parseNumber(text);
           parsed = n === null ? null : Math.round(n);
@@ -221,6 +248,45 @@ function renderTool(tool: Tool): HTMLElement {
 
   refresh();
   return el('div', { class: 'tool' }, head, form, results);
+}
+
+/** What a field shows, as text, for the copied summary. */
+function fieldText(f: Field, values: Values, unit: Unit): string | null {
+  const v = values[f.key];
+  switch (f.kind) {
+    case 'length': return typeof v === 'number' ? `${inputText(v, unit, f.long)} ${unitLabel(unit, f.long)}` : null;
+    case 'number': return typeof v === 'number' ? `${v}${f.suffix ?? ''}` : null;
+    case 'percent': return typeof v === 'number' ? `${v}%` : null;
+    case 'int': return typeof v === 'number' ? `${v}` : null;
+    case 'select': return f.options.find((o) => o.value === v)?.label ?? null;
+    case 'check': return v ? 'yes' : 'no';
+    case 'text': return typeof v === 'string' && v ? v : null;
+  }
+}
+
+/** The inputs and results as plain text, for pasting into project notes. */
+export function describe(tool: Tool, values: Values, out: Output, unit: Unit): string {
+  const lines: string[] = [`${tool.name} (Thimble)`, ''];
+  for (const f of tool.fields) {
+    if (f.showIf && !f.showIf(values)) continue;
+    const t = fieldText(f, values, unit);
+    if (t !== null) lines.push(`${f.label}: ${t}`);
+  }
+  lines.push('');
+  if (out.warn) lines.push(`! ${out.warn}`);
+  if (out.headline) lines.push(`${out.headline.label}: ${out.headline.value}${out.headline.note ? ` (${out.headline.note})` : ''}`);
+  for (const r of out.rows ?? []) lines.push(`${r.label}: ${r.value}${r.sub ? ` (${r.sub})` : ''}`);
+  if (out.table) {
+    lines.push('', out.table.head.join('\t'));
+    for (const row of out.table.rows) lines.push(row.map((c) => c.text).join('\t'));
+  }
+  for (const c of out.cards ?? []) {
+    lines.push('', `${c.title} (${c.subtitle})`);
+    for (const [k, v] of c.pairs) lines.push(`  ${k}: ${v}`);
+    lines.push(`  ${c.tip}`);
+  }
+  if (out.notes?.length) lines.push('', ...out.notes.map((n) => `- ${n}`));
+  return lines.join('\n').trim() + '\n';
 }
 
 function renderOutput(target: HTMLElement, out: Output): void {
@@ -275,3 +341,13 @@ function renderOutput(target: HTMLElement, out: Output): void {
 }
 
 render();
+
+// Offline copy for the published page. Nothing to do when opened as a file or
+// inside another page.
+try {
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+} catch {
+  /* not available here */
+}

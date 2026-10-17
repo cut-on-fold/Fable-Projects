@@ -28,10 +28,9 @@ like to know:
 
 ## Thimble
 
-- [ ] **Overlocker settings** — differential feed, stitch length and width,
-      and tension starting points by fabric, next to the needle table.
-- [ ] **Seam allowance converter** — the pattern has ⅝ in and you sew at 1 cm:
-      what to trim and where to put the guide tape.
+- [ ] **Overlocker tensions** — the settings now give differential feed, stitch
+      length and width; tension starting points vary too much by machine to
+      put in a table without knowing the model.
 - [ ] **Hem allowance for curved hems** — how narrow a hem a curve can take
       before it puckers, by the hem's radius.
 - [ ] **Dart intake from a measurement difference** — waist to hip difference
@@ -39,21 +38,14 @@ like to know:
 - [ ] **Pattern piece yardage** — rough yardage for a list of piece sizes and
       cut counts, for when there is no envelope figure. (Grain-Nest does this
       properly; this would be the five-second version.)
-- [ ] **Thread estimate** — metres of thread a project uses by seam length and
-      stitch type, so a spool is not short halfway through.
-- [ ] **Save a page of results** — named sets of inputs per project, exported as
-      text to paste into Stash's project notes.
-- [ ] **Imperial fabric widths with metric lengths** — some shops sell 60 in
-      wide fabric by the metre; let a width field take a suffix without
-      switching the whole page.
-- [ ] **Installable** — a web-app manifest and a tiny service worker so the
-      page can sit on a phone's home screen and open with no connection.
+- [ ] **Named result sets** — Copy gives one calculator's inputs and results as
+      text; saving several per project, to reopen later, would be the next step.
+- [ ] **Seams from a pattern** — the Thread calculator takes a total seam
+      length; reading it from a Grain-Nest cut list or a graded SVG would save
+      the guessing.
 
 ## Other things
 
-- [ ] **Projector calibration card** — a printable or projected test page for
-      Pattern Projector with a ruled grid and a calibration square matching the
-      one Grain-Nest exports, to check keystone and scale before cutting.
 - [ ] **Fabric label printer** — labels for fabric bolts and folded stash
       (fibre, width, length, pre-washed, date) printed from Stash's export, so
       the shelves match the database.
@@ -62,5 +54,12 @@ like to know:
 
 ## Shipped
 
+- [x] **Calibration cards** — projector and print test cards matching Grain-Nest's
+      calibration square and colours, with grid, rulers, corner squares and circle.
+- [x] **Thimble v0.2.0** — Seam allowances and Thread calculators; overlocker
+      settings on every needle card; a Copy button that writes one calculator's
+      inputs and results as text for project notes; long lengths typed in metres
+      or yards; installable on a phone with an offline copy (manifest, icons,
+      service worker); version in the footer.
 - [x] **Thimble v0.1.0** — the first eleven calculators, metric and imperial,
       light and dark, phone layout, GitHub Pages workflow.
