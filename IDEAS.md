@@ -46,14 +46,17 @@ like to know:
 
 ## Other things
 
-- [ ] **Fabric label printer** — labels for fabric bolts and folded stash
-      (fibre, width, length, pre-washed, date) printed from Stash's export, so
-      the shelves match the database.
-- [ ] **Swatch book page** — a printable page per fabric with a swatch window,
-      its Stash fields and a burn-test result.
+- [ ] **Bolt End from Stash itself** — a "Print labels…" item in Stash that
+      writes the CSV and opens Bolt End with it, instead of exporting first.
+- [ ] **Burn-test card** — a swatch card variant with the fibre test results
+      (flame, smell, ash) and the usual fibres' behaviour printed on it.
 
 ## Shipped
 
+- [x] **Bolt End v0.1.0** — shelf labels, swatch cards and hang tags from a
+      Stash CSV export: six Avery layouts plus cards and tags, choose the lines,
+      filter by status or a word, start part way down a used sheet, print at
+      true size. One Pages site for all the web projects, and a CLAUDE.md.
 - [x] **Thimble v0.3.0** — Weigh fabric (length left from the kitchen scales),
       Price compare (metre, yard, fat quarter, any width), Waistbands and cuffs,
       Sleeve cap ease, Cup size and FBA, Yardage estimate from piece sizes. The
