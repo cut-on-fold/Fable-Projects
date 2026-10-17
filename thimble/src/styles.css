@@ -72,7 +72,8 @@ body {
   font: 16px/1.5 var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+textarea { resize: vertical; line-height: 1.4; }
 h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -122,20 +123,24 @@ a { color: var(--accent); }
 .body { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
 @media (max-width: 760px) { .body { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
 
-.nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
+.nav { position: sticky; top: 16px; }
+.nav-list { display: flex; flex-direction: column; gap: 3px; }
+.nav-group { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 14px 4px; }
+.nav-group:first-child { margin-top: 4px; }
+.nav-select {
+  display: none;
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+  font-weight: 700;
+  min-height: 44px;
+}
 @media (max-width: 760px) {
-  .nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-    margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    scrollbar-width: none;
-  }
-  .nav::-webkit-scrollbar { display: none; }
+  .nav { position: static; }
+  .nav-list { display: none; }
+  .nav-select { display: block; }
 }
 .nav button {
   text-align: left;
@@ -154,6 +159,7 @@ a { color: var(--accent); }
 /* ---------- tool */
 .tool { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .tool-head h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.tool-head h2:focus { outline: none; }
 .tool-head p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
 
 .form {
@@ -167,7 +173,7 @@ a { color: var(--accent); }
 .field label { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
 .field .hint { font-size: 13px; color: var(--muted); }
 .control { position: relative; display: flex; align-items: center; }
-.control input, .control select {
+.control input, .control select, .control textarea {
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: 8px;

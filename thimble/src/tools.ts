@@ -12,71 +12,18 @@ import { easeFromFinished, stretchBand, stretchPercent, withNegativeEase } from 
 import { searchNeedles } from './calc/needles';
 import { STITCH_KINDS, TYPICAL_SEAMS, threadNeeded } from './calc/thread';
 import { allowanceChange, finishedFromFlat } from './calc/allowance';
-import { CM_PER_IN, formatBuy, formatLength, formatPercent, type Unit } from './units';
+import { CM_PER_IN, formatBuy, formatLength, formatPercent } from './units';
+import { SA, SA_NARROW, WIDTH, WIDTH_NARROW, bool, num, pct, str, type Output, type Tool, type UnitDefault, type Values } from './framework';
+import { MORE_TOOLS } from './tools-more';
 
-export type Value = number | string | boolean | null;
-export type Values = Record<string, Value>;
+export type { Cell, Field, Group, Output, Tool, UnitDefault, Value, Values } from './framework';
+export { GROUPS } from './framework';
+export { resolveDefault } from './framework';
 
-/** A default that differs by unit: `in` is given in inches. */
-export type UnitDefault = number | { cm: number; in: number };
-
-interface FieldBase {
-  key: string;
-  label: string;
-  hint?: string;
-  wide?: boolean;
-  showIf?: (v: Values) => boolean;
-}
-export type Field =
-  | (FieldBase & { kind: 'length'; default: UnitDefault | null; /** typed and shown in metres or yards */ long?: boolean })
-  | (FieldBase & { kind: 'number'; default: number | null; suffix?: string })
-  | (FieldBase & { kind: 'percent'; default: number | null })
-  | (FieldBase & { kind: 'int'; default: number | null })
-  | (FieldBase & { kind: 'select'; default: string; options: Array<{ value: string; label: string }>; sets?: (value: string) => Values })
-  | (FieldBase & { kind: 'check'; default: boolean })
-  | (FieldBase & { kind: 'text'; default: string; placeholder?: string });
-
-export interface Cell { text: string; cls?: string }
-export interface Output {
-  headline?: { label: string; value: string; note?: string };
-  rows?: Array<{ label: string; value: string; sub?: string }>;
-  table?: { head: string[]; rows: Cell[][]; numeric?: boolean[] };
-  notes?: string[];
-  warn?: string;
-  cards?: Array<{ title: string; subtitle: string; pairs: Array<[string, string]>; tip: string }>;
-  empty?: string;
-}
-
-export interface Tool {
-  id: string;
-  name: string;
-  blurb: string;
-  fields: Field[];
-  compute: (v: Values, unit: Unit) => Output;
-}
-
-export function resolveDefault(d: UnitDefault | null, unit: Unit): number | null {
-  if (d === null) return null;
-  if (typeof d === 'number') return d;
-  return unit === 'in' ? d.in * CM_PER_IN : d.cm;
-}
-
-const num = (v: Values, key: string): number | null => (typeof v[key] === 'number' ? (v[key] as number) : null);
-const str = (v: Values, key: string): string => (typeof v[key] === 'string' ? (v[key] as string) : '');
-const bool = (v: Values, key: string): boolean => v[key] === true;
-const pct = (v: Values, key: string): number | null => {
-  const n = num(v, key);
-  return n === null ? null : n / 100;
-};
-
-const SA: UnitDefault = { cm: 1.5, in: 0.625 };
-const SA_NARROW: UnitDefault = { cm: 1, in: 0.375 };
-const WIDTH: UnitDefault = { cm: 150, in: 60 };
-const WIDTH_NARROW: UnitDefault = { cm: 115, in: 45 };
-
-export const TOOLS: Tool[] = [
+const BASE_TOOLS: Tool[] = [
   {
     id: 'bias',
+    group: 'Cutting',
     name: 'Bias strips',
     blurb: 'How much continuous bias a square or offcut gives, how big a square to cut for a length you need, and the strip width for a binding.',
     fields: [
@@ -129,6 +76,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'circle',
+    group: 'Cutting',
     name: 'Circle skirt',
     blurb: 'Waist radius, hem radius, hem length and the fabric a circle skirt takes, from a full circle to a quarter.',
     fields: [
@@ -174,6 +122,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'gathers',
+    group: 'Cutting',
     name: 'Gathers and ruffles',
     blurb: 'Cut length for a gathered edge or ruffle, how many strips that is across the fabric, and the fabric to cut.',
     fields: [
@@ -211,6 +160,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'buttons',
+    group: 'Cutting',
     name: 'Buttons',
     blurb: 'Even spacing down a placket by count, by spacing, or stepping out from one button that has to sit at the bust. And the buttonhole length.',
     fields: [
@@ -256,6 +206,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'elastic',
+    group: 'Fitting',
     name: 'Elastic',
     blurb: 'How long to cut elastic for a waist, leg or neckline, by the kind of elastic.',
     fields: [
@@ -280,6 +231,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'bands',
+    group: 'Fitting',
     name: 'Knit bands',
     blurb: 'Neckbands, cuffs and hem bands cut shorter than the opening so they lie flat.',
     fields: [
@@ -305,6 +257,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'pleats',
+    group: 'Cutting',
     name: 'Pleats',
     blurb: 'Fabric for a run of knife, box or inverted pleats, and where to chalk the fold and placement lines.',
     fields: [
@@ -330,6 +283,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'width',
+    group: 'Buying',
     name: 'Fabric width',
     blurb: 'The pattern asks for a length at one width and the bolt is another. Rounded up to the next 10 cm or eighth of a yard.',
     fields: [
@@ -354,6 +308,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'shrink',
+    group: 'Buying',
     name: 'Shrinkage',
     blurb: 'Measure a swatch before and after washing, then buy enough that what is left after pre-washing still covers the pattern.',
     fields: [
@@ -389,6 +344,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'stretch',
+    group: 'Fitting',
     name: 'Stretch and ease',
     blurb: 'Stretch percentage from a marked fold, what that fabric suits, and negative ease both ways.',
     fields: [
@@ -433,6 +389,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'allowance',
+    group: 'Cutting',
     name: 'Seam allowances',
     blurb: 'What to trim or add when you sew at a different allowance from the pattern, and the finished measurement of a pattern piece measured flat.',
     fields: [
@@ -474,6 +431,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'thread',
+    group: 'Buying',
     name: 'Thread',
     blurb: 'How much thread the seams of a project use, by stitch, and whether the spool will last.',
     fields: [
@@ -499,6 +457,7 @@ export const TOOLS: Tool[] = [
   },
   {
     id: 'needles',
+    group: 'Machine',
     name: 'Needle and thread',
     blurb: 'A starting needle, thread, stitch and overlocker setting for the fabric on the table. Test on a scrap of the same layers.',
     fields: [{ key: 'q', kind: 'text', label: 'Fabric', default: '', placeholder: 'ponte, chiffon, denim, swim…', wide: true }],
@@ -512,3 +471,5 @@ export const TOOLS: Tool[] = [
     },
   },
 ];
+
+export const TOOLS: Tool[] = [...BASE_TOOLS, ...MORE_TOOLS];

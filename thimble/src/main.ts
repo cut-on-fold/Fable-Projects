@@ -1,5 +1,5 @@
 import './styles.css';
-import { TOOLS, resolveDefault, type Field, type Output, type Tool, type Values } from './tools';
+import { GROUPS, TOOLS, resolveDefault, type Field, type Output, type Tool, type Values } from './tools';
 import { inputText, parseLength, parseNumber, unitLabel, type Unit } from './units';
 
 const STORAGE_KEY = 'thimble.v1';
@@ -107,19 +107,32 @@ function render(): void {
   brand.append(el('div', {}, el('h1', {}, 'Thimble'), el('p', {}, 'Cutting-table calculators')));
   const header = el('header', { class: 'header' }, brand, unitToggle);
 
-  const nav = el('nav', { class: 'nav', 'aria-label': 'Calculators' });
-  for (const t of TOOLS) {
-    const b = el('button', { type: 'button', id: `nav-${t.id}` }, t.name);
-    if (t.id === tool.id) b.setAttribute('aria-current', 'page');
-    b.addEventListener('click', () => {
-      state.tool = t.id;
-      save(state);
-      history.replaceState(null, '', `#${t.id}`);
-      render();
-      document.getElementById(`tool-${t.id}`)?.focus();
-    });
-    nav.append(b);
+  const open = (id: string) => {
+    state.tool = id;
+    save(state);
+    history.replaceState(null, '', `#${id}`);
+    render();
+    document.getElementById(`tool-${id}`)?.focus();
+  };
+  const list = el('div', { class: 'nav-list' });
+  const select = el('select', { class: 'nav-select', id: 'nav-select', 'aria-label': 'Calculator' });
+  for (const g of GROUPS) {
+    const tools = TOOLS.filter((t) => t.group === g);
+    if (!tools.length) continue;
+    list.append(el('h3', { class: 'nav-group' }, g));
+    const og = el('optgroup', { label: g });
+    for (const t of tools) {
+      const b = el('button', { type: 'button', id: `nav-${t.id}` }, t.name);
+      if (t.id === tool.id) b.setAttribute('aria-current', 'page');
+      b.addEventListener('click', () => open(t.id));
+      list.append(b);
+      og.append(el('option', { value: t.id }, t.name));
+    }
+    select.append(og);
   }
+  select.value = tool.id;
+  select.addEventListener('change', () => open(select.value));
+  const nav = el('nav', { class: 'nav', 'aria-label': 'Calculators' }, select, list);
 
   const panel = renderTool(tool);
   const app = el('div', { class: 'app' }, header, el('div', { class: 'body' }, nav, panel),
@@ -139,7 +152,7 @@ function renderTool(tool: Tool): HTMLElement {
   const results = el('section', { class: 'results', 'aria-label': 'Results' },
     el('div', { class: 'results-bar' }, el('span', {}, 'Results'), copy), body);
   const wrappers = new Map<string, HTMLElement>();
-  const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
+  const inputs = new Map<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>();
   let latest: Output = {};
 
   const refresh = () => {
@@ -185,7 +198,7 @@ function renderTool(tool: Tool): HTMLElement {
       select.addEventListener('change', () => {
         values[f.key] = select.value;
         if (f.sets) {
-          for (const [k, val] of Object.entries(f.sets(select.value))) {
+          for (const [k, val] of Object.entries(f.sets(select.value, state.unit))) {
             values[k] = val;
             const target = inputs.get(k);
             const tf = tool.fields.find((x) => x.key === k);
@@ -205,6 +218,15 @@ function renderTool(tool: Tool): HTMLElement {
       });
       inputs.set(f.key, input);
       wrapper.append(input, label);
+    } else if (f.kind === 'lines') {
+      const area = el('textarea', { id, rows: '5', placeholder: f.placeholder ?? '', spellcheck: 'false' });
+      area.value = String(values[f.key] ?? '');
+      area.addEventListener('input', () => {
+        values[f.key] = area.value;
+        refresh();
+      });
+      inputs.set(f.key, area);
+      wrapper.append(label, el('div', { class: 'control' }, area));
     } else if (f.kind === 'text') {
       const input = el('input', { type: 'search', id, placeholder: f.placeholder ?? '' });
       input.value = String(values[f.key] ?? '');
@@ -261,6 +283,7 @@ function fieldText(f: Field, values: Values, unit: Unit): string | null {
     case 'select': return f.options.find((o) => o.value === v)?.label ?? null;
     case 'check': return v ? 'yes' : 'no';
     case 'text': return typeof v === 'string' && v ? v : null;
+    case 'lines': return typeof v === 'string' && v ? '\n  ' + v.trim().split('\n').join('\n  ') : null;
   }
 }
 

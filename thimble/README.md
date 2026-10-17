@@ -23,7 +23,16 @@ anywhere: your numbers stay in the browser.
 | **Stretch and ease** | A marked fold stretched, the stretch the pattern wants, body measurement, negative ease | Stretch percentage and what that fabric suits, whether it meets the pattern, finished measurements |
 | **Seam allowances** | The pattern's allowance and yours; a piece measured flat | What to trim or add to every edge; the finished garment measurement and its ease |
 | **Thread** | Total seam length, stitch type, spool size | Thread used, split by needle and looper, and how many spools |
+| **Waistbands and cuffs** | Waist or wrist, ease, underlap, finished width | Cut length and width, interfacing, where the side seams and centre back fall along the band |
+| **Sleeve cap** | Cap and armscye seam lines, fabric | Cap ease, whether it suits the fabric, how much to take out or add |
+| **Cup size and FBA** | High bust, full bust, the cup the pattern drafts for | Sewing cup, the size to cut by full bust, FBA or SBA per side |
+| **Weigh fabric** | gsm or oz/yd² (or a weighed sample), width, what the piece weighs | How long the piece is; weight class; what a metre weighs |
+| **Price compare** | Two prices by metre, yard or fat quarter, at two widths | Price per square metre or yard, which is cheaper, what the project costs on each |
+| **Yardage estimate** | Piece sizes and counts, fabric width, waste | Fabric to buy for a pattern with no envelope figure |
 | **Needle and thread** | The fabric's name or type | Needle type and size, thread, stitch length, overlocker settings and a tip, from sheers to leather |
+
+The calculators are grouped as Cutting, Fitting, Buying and Machine: a list
+down the side on a desk-sized screen, a dropdown on a phone.
 
 Lengths take fractions (`1 1/2`, `5/8`, `⅝`) and unit suffixes (`45"`, `2 yd`,
 `1.2 m`, `250 mm`) whichever unit is switched on. Long lengths (seams, spools,
@@ -52,8 +61,9 @@ npm run build       # dist/index.html, one self-contained file
 
 Layout: `src/calc/` is the arithmetic, one module per calculator, plain
 functions over centimetres and unit-tested in `tests/`. `src/units.ts`
-parses and formats lengths. `src/tools.ts` describes each calculator as
-fields in and rows out, and `src/main.ts` draws them. `public/` holds the
+parses and formats lengths. `src/framework.ts` is the shape of a calculator
+(fields in, rows out); `src/tools.ts` and `src/tools-more.ts` describe each
+one, and `src/main.ts` draws them. `public/` holds the
 manifest and icons; `sw.template.js` becomes `dist/sw.js` at build time with
 the version written in, so each release replaces the offline copy.
 

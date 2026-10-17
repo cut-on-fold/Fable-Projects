@@ -1,6 +1,6 @@
 {
   "name": "thimble",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cutting-table calculators for sewing: bias strips, circle skirts, gathers, buttons, elastic, pleats, fabric width, shrinkage, stretch, needle and thread",
   "private": true,
   "license": "MIT",

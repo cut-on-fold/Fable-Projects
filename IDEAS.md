@@ -35,9 +35,9 @@ like to know:
       before it puckers, by the hem's radius.
 - [ ] **Dart intake from a measurement difference** — waist to hip difference
       shared across the darts and side seams.
-- [ ] **Pattern piece yardage** — rough yardage for a list of piece sizes and
-      cut counts, for when there is no envelope figure. (Grain-Nest does this
-      properly; this would be the five-second version.)
+- [ ] **Shaped waistbands** — the straight band is done; a contoured band needs
+      the hip measurement and a curve, which is pattern drafting rather than
+      arithmetic.
 - [ ] **Named result sets** — Copy gives one calculator's inputs and results as
       text; saving several per project, to reopen later, would be the next step.
 - [ ] **Seams from a pattern** — the Thread calculator takes a total seam
@@ -54,6 +54,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Thimble v0.3.0** — Weigh fabric (length left from the kitchen scales),
+      Price compare (metre, yard, fat quarter, any width), Waistbands and cuffs,
+      Sleeve cap ease, Cup size and FBA, Yardage estimate from piece sizes. The
+      nineteen calculators are grouped (Cutting, Fitting, Buying, Machine) with a
+      dropdown on phones.
 - [x] **Calibration cards** — projector and print test cards matching Grain-Nest's
       calibration square and colours, with grid, rulers, corner squares and circle.
 - [x] **Thimble v0.2.0** — Seam allowances and Thread calculators; overlocker

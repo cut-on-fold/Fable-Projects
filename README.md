@@ -7,7 +7,7 @@ is meant to sit alongside, not replace.
 
 | Project | What it is | Status |
 |---|---|---|
-| [Thimble](thimble/) | Cutting-table calculators: bias strips, circle skirts, gathers, buttons, elastic, knit bands, pleats, fabric width, shrinkage, stretch, seam allowances, thread, needle and overlocker settings. One web page, installable on a phone, works offline. | v0.2.0 |
+| [Thimble](thimble/) | Nineteen cutting-table calculators in four groups: cutting (bias, circle skirts, gathers, pleats, buttons, seam allowances, waistbands), fitting (elastic, knit bands, stretch, sleeve cap, cup size and FBA), buying (fabric width, shrinkage, thread, weighing fabric, price compare, yardage estimate) and machine (needle, thread and overlocker settings). One web page, installable on a phone, works offline. | v0.3.0 |
 | [Calibration cards](calibration/) | SVG test cards for Pattern Projector and printers, matching Grain-Nest's 4 in square and colours: cm grid, inch rulers, corner squares and a circle so scale, keystone and skew each show up as a measurement. | ready |
 
 [IDEAS.md](IDEAS.md) is the running list of what could come next, and the
