@@ -40,9 +40,8 @@ like to know:
       arithmetic.
 - [ ] **Named result sets** — Copy gives one calculator's inputs and results as
       text; saving several per project, to reopen later, would be the next step.
-- [ ] **Seams from a pattern** — the Thread calculator takes a total seam
-      length; reading it from a Grain-Nest cut list or a graded SVG would save
-      the guessing.
+- [ ] **Hems in the thread estimate** — the export SVG gives seam lines; hems
+      and topstitching are still a guess on top.
 
 ## Other things
 
@@ -53,6 +52,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Thimble v0.5.0** — Grain-Nest files: Thread reads the sew lines of an
+      export SVG; Yardage estimate reads piece sizes and cut codes from a
+      pattern SVG; a Cutting list with a box per copy from the cut list text.
+      Circle skirt says how much hem allowance there is to ease in. People can
+      be copied as text and pasted on another device.
 - [x] **Thimble v0.4.0** — People: read Stash's Measurements.csv (or type
       someone in) and fill the body fields of Circle skirt, Elastic, Waistbands,
       Stretch and ease and Cup size and FBA from a name. Reference group:

@@ -270,6 +270,23 @@ td.kind-fold { color: var(--accent); font-weight: 700; }
 .footer { margin-top: 36px; color: var(--muted); font-size: 13px; }
 .footer p { margin: 4px 0; }
 
+/* ---------- file fields and the cutting list */
+.field .file { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.field .file .btn { border: 1px solid var(--line-strong); background: var(--panel); border-radius: 999px; padding: 8px 16px; font-weight: 700; color: var(--accent); cursor: pointer; }
+.field .file .btn:hover { background: var(--accent-soft); }
+.field .file input[type='file'] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cutlist { display: flex; flex-direction: column; gap: 6px; }
+.progress-row { display: flex; justify-content: space-between; align-items: center; }
+.progress { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { height: 100%; background: var(--accent); transition: width 0.15s; }
+.cut-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.cut-item.done { opacity: 0.55; }
+.cut-item.done .cut-name { text-decoration: line-through; }
+.cut-name { min-width: 0; overflow-wrap: anywhere; }
+.cut-count { color: var(--muted); }
+.cut-boxes { display: flex; gap: 8px; flex: none; }
+.cut-boxes input { width: 24px; height: 24px; accent-color: var(--accent); margin: 0; }
+
 /* ---------- people */
 .people { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .people .label-text, .field .label-text { font-size: 13px; font-weight: 700; color: var(--muted); }

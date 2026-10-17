@@ -22,13 +22,14 @@ anywhere: your numbers stay in the browser.
 | **Shrinkage** | A swatch measured before and after washing, the length the pattern needs | Shrinkage along and across the grain, length to buy, width after washing |
 | **Stretch and ease** | A marked fold stretched, the stretch the pattern wants, body measurement, negative ease | Stretch percentage and what that fabric suits, whether it meets the pattern, finished measurements |
 | **Seam allowances** | The pattern's allowance and yours; a piece measured flat | What to trim or add to every edge; the finished garment measurement and its ease |
-| **Thread** | Total seam length, stitch type, spool size | Thread used, split by needle and looper, and how many spools |
+| **Thread** | Total seam length (typed, or read from a Grain-Nest export SVG), stitch type, spool size | Thread used, split by needle and looper, and how many spools |
+| **Cutting list** | A Grain-Nest cut list, or any list with ×2 after a name | A tickable list, one box per copy, with progress; stays ticked on the device |
 | **Waistbands and cuffs** | Waist or wrist, ease, underlap, finished width | Cut length and width, interfacing, where the side seams and centre back fall along the band |
 | **Sleeve cap** | Cap and armscye seam lines, fabric | Cap ease, whether it suits the fabric, how much to take out or add |
 | **Cup size and FBA** | High bust, full bust, the cup the pattern drafts for | Sewing cup, the size to cut by full bust, FBA or SBA per side |
 | **Weigh fabric** | gsm or oz/yd² (or a weighed sample), width, what the piece weighs | How long the piece is; weight class; what a metre weighs |
 | **Price compare** | Two prices by metre, yard or fat quarter, at two widths | Price per square metre or yard, which is cheaper, what the project costs on each |
-| **Yardage estimate** | Piece sizes and counts, fabric width, waste | Fabric to buy for a pattern with no envelope figure |
+| **Yardage estimate** | Piece sizes and counts (typed, or read from a pattern SVG with Grain-Nest cut codes), fabric width, waste | Fabric to buy for a pattern with no envelope figure |
 | **Needle and thread** | The fabric's name or type | Needle type and size, thread, stitch length, overlocker settings and a tip, from sheers to leather |
 | **Pressing and interfacing** | A fibre or fabric | Iron setting, steam, press cloth, the interfacing to use and a tip |
 | **Seam finishes** | A fabric | The best finish, the alternatives, the hem |
@@ -45,6 +46,16 @@ fabric to buy) are typed in metres or yards. Inches come out in eighths
 
 **Copy** on the results card puts that calculator's inputs and results on the
 clipboard as plain text, for a project's notes in Stash.
+
+**Grain-Nest files.** Thread reads an export SVG and adds up its sew lines;
+Yardage estimate reads a pattern SVG whose pieces are named Grain-Nest's way
+(`7 Skirt Back C2M`, `1 Front C1MOF`) and lists them opened out and counted
+for the fabric chosen; Cutting list takes the cut list text. Files are read in
+the browser and not kept.
+
+**People.** Measurements from Stash's Measurements.csv, or typed in, fill the
+body fields of the calculators that have them. Copy people as text on one
+device and paste them on another to move them across.
 
 **On a phone:** open the published page in Safari or Chrome and add it to the
 home screen. It installs as an app and opens with no connection; it updates

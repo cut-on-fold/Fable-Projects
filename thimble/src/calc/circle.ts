@@ -23,6 +23,8 @@ export interface CircleResult {
   outerRadius: number;
   /** Finished hem circumference. */
   hemLength: number;
+  /** How much longer the hem allowance's raw edge is than the hem line: the extra to ease in. */
+  hemEase: number;
   /** Quarter-circle panels the skirt is cut as, or 0 when cut in one piece. */
   panels: number;
   /** Quarter panels that fit side by side across the fabric. */
@@ -38,26 +40,27 @@ export function circleSkirt(i: CircleInput): CircleResult | null {
   const waistCutRadius = Math.max(0, waistRadius - i.waistAllowance);
   const outerRadius = waistRadius + i.length + i.hemAllowance;
   const hemLength = 2 * Math.PI * i.fraction * (waistRadius + i.length);
+  const hemEase = 2 * Math.PI * i.fraction * i.hemAllowance;
 
   const panels = Math.ceil(i.fraction * 4 - 1e-9);
   const W = i.fabricWidth;
   if (!(W > 0)) {
-    return { waistRadius, waistCutRadius, outerRadius, hemLength, panels, across: 0, fabricLength: null, onePiece: false };
+    return { waistRadius, waistCutRadius, outerRadius, hemLength, hemEase, panels, across: 0, fabricLength: null, onePiece: false };
   }
 
   // A full circle cut on a double fold needs a square 2R on a side.
   if (Math.abs(i.fraction - 1) < 1e-9 && W >= 2 * outerRadius) {
-    return { waistRadius, waistCutRadius, outerRadius, hemLength, panels: 0, across: 1, fabricLength: 2 * outerRadius, onePiece: true };
+    return { waistRadius, waistCutRadius, outerRadius, hemLength, hemEase, panels: 0, across: 1, fabricLength: 2 * outerRadius, onePiece: true };
   }
   // A half circle cut on a single fold needs a piece 2R by R.
   if (Math.abs(i.fraction - 0.5) < 1e-9 && W >= outerRadius) {
-    return { waistRadius, waistCutRadius, outerRadius, hemLength, panels: 0, across: 1, fabricLength: 2 * outerRadius, onePiece: true };
+    return { waistRadius, waistCutRadius, outerRadius, hemLength, hemEase, panels: 0, across: 1, fabricLength: 2 * outerRadius, onePiece: true };
   }
   const panel = outerRadius + i.seamAllowance;
   const across = Math.floor(W / panel + 1e-9);
   if (across === 0) {
-    return { waistRadius, waistCutRadius, outerRadius, hemLength, panels, across: 0, fabricLength: null, onePiece: false };
+    return { waistRadius, waistCutRadius, outerRadius, hemLength, hemEase, panels, across: 0, fabricLength: null, onePiece: false };
   }
   const rows = Math.ceil(panels / across);
-  return { waistRadius, waistCutRadius, outerRadius, hemLength, panels, across, fabricLength: rows * panel, onePiece: false };
+  return { waistRadius, waistCutRadius, outerRadius, hemLength, hemEase, panels, across, fabricLength: rows * panel, onePiece: false };
 }

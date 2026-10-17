@@ -35,6 +35,9 @@ const URL = `http://127.0.0.1:${server.address().port}/`;
 const launch = { executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined };
 const browser = await chromium.launch(launch);
 const errors = [];
+const EXPORT_SVG = readFileSync(join(HERE, '..', 'tests', 'fixtures', 'example-export.svg'));
+const PATTERN_SVG = readFileSync(join(HERE, '..', 'tests', 'fixtures', 'example-pattern.svg'));
+const CUT_LIST = 'Grain-Nest cut list\nGenerated: now\n====\n\nPIECES\n  6 Skirt Front C1MOF.svg ×1\n  7 Skirt Back C2M.svg ×2\n\nTOTAL FABRIC NEEDED\n  1.2 m\n';
 const SAMPLE_CSV = 'Name,Status,High bust,Full bust / chest,Waist,Hips,Wrist circumference\nAv,Current,36 in,40.5 in,34 in,44 in,6.25 in\nMum,Current,38 in,42 in,37 in,44 in,6.5 in\n';
 
 async function run(name, { width, dark }) {
@@ -46,14 +49,14 @@ async function run(name, { width, dark }) {
   const phone = width <= 760;
   const go = (id) => (phone ? page.selectOption('#nav-select', id) : page.click(`#nav-${id}`));
   const tools = await page.$$eval('.nav-list button', (bs) => bs.map((b) => b.id.replace('nav-', '')));
-  if (tools.length < 20) errors.push(`${name}: only ${tools.length} tools`);
+  if (tools.length < 24) errors.push(`${name}: only ${tools.length} tools`);
   for (const id of tools) {
     await go(id);
     await page.waitForTimeout(30);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     if (sw > width) errors.push(`${name}: ${id} overflows (${sw} > ${width})`);
     const text = await page.$eval('.tool', (t) => t.innerText);
-    if (!text.toLowerCase().includes('results') && id !== 'people') errors.push(`${name}: ${id} has no results`);
+    if (!text.toLowerCase().includes('results') && id !== 'people' && id !== 'cutting') errors.push(`${name}: ${id} has no results`);
     if (['buttons', 'people', 'weigh'].includes(id)) await page.screenshot({ path: join(SHOTS, `${name}-${id}.png`), fullPage: true });
   }
 
@@ -89,6 +92,30 @@ async function run(name, { width, dark }) {
   const high = await page.inputValue('#bust-high');
   const cup = await page.$eval('.headline .value', (e) => e.textContent);
   if (high !== '96.52' || cup !== 'D') errors.push(`${name}: fill from Mum gave ${high} / ${cup}`);
+  // Grain-Nest files: seams from an export, pieces from a pattern, a cut list to tick
+  await go('thread');
+  await page.setInputFiles('#thread-svg', { name: 'example-export.svg', mimeType: 'image/svg+xml', buffer: EXPORT_SVG });
+  await page.waitForTimeout(200);
+  const seamsMsg = await page.textContent('#thread-svg-msg');
+  const seamsBox = await page.inputValue('#thread-seams');
+  if (!/sew lines read/.test(seamsMsg) || !(parseFloat(seamsBox) > 5)) errors.push(`${name}: seams from svg: ${seamsMsg} / ${seamsBox}`);
+  await go('yardage');
+  await page.setInputFiles('#yardage-svg', { name: 'example-pattern.svg', mimeType: 'image/svg+xml', buffer: PATTERN_SVG });
+  await page.waitForTimeout(200);
+  const piecesText = await page.inputValue('#yardage-pieces');
+  const yardMsg = await page.textContent('#yardage-svg-msg');
+  if (!/pieces read/.test(yardMsg) || !/Bodice Front/.test(piecesText)) errors.push(`${name}: pieces from svg: ${yardMsg}`);
+  await go('cutting');
+  await page.fill('#cutting-text', CUT_LIST);
+  await page.waitForTimeout(50);
+  const boxes = await page.$$('.cut-boxes input');
+  if (boxes.length !== 3) errors.push(`${name}: cut list boxes ${boxes.length}`);
+  else {
+    await page.locator('.cut-boxes input').nth(1).click();
+    await page.waitForTimeout(30);
+    const progress = await page.textContent('#cutting-progress');
+    if (progress !== '1 of 3 cut') errors.push(`${name}: cut progress ${progress}`);
+  }
   await page.evaluate(() => localStorage.clear());
 
   // offline, once

@@ -2,6 +2,7 @@ import './styles.css';
 import { GROUPS, TOOLS, resolveDefault, type Field, type Output, type Tool, type Values } from './tools';
 import { formatLength, inputText, parseLength, parseNumber, unitLabel, type Unit } from './units';
 import { BODY_FIELDS, mergePeople, peopleFromCsv, type Person } from './people';
+import { parseCutList } from './calc/gncodes';
 
 const STORAGE_KEY = 'thimble.v1';
 
@@ -10,10 +11,11 @@ interface State {
   tool: string;
   values: Record<string, Values>;
   people: Person[];
+  cutting: { text: string; done: Record<string, number> };
 }
 
 function load(): State {
-  const fallback: State = { unit: 'cm', tool: TOOLS[0]!.id, values: {}, people: [] };
+  const fallback: State = { unit: 'cm', tool: TOOLS[0]!.id, values: {}, people: [], cutting: { text: '', done: {} } };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
@@ -23,6 +25,7 @@ function load(): State {
       tool: TOOLS.some((t) => t.id === parsed.tool) ? (parsed.tool as string) : fallback.tool,
       values: typeof parsed.values === 'object' && parsed.values ? parsed.values : {},
       people: Array.isArray(parsed.people) ? parsed.people.filter((p) => p && typeof p.name === 'string' && p.measures) : [],
+      cutting: parsed.cutting && typeof parsed.cutting.text === 'string' ? { text: parsed.cutting.text, done: parsed.cutting.done ?? {} } : { text: '', done: {} },
     };
   } catch {
     return fallback;
@@ -43,7 +46,7 @@ if (TOOLS.some((t) => t.id === hashTool)) state.tool = hashTool;
 
 function defaultsFor(tool: Tool, unit: Unit): Values {
   const v: Values = {};
-  for (const f of tool.fields) v[f.key] = f.kind === 'length' ? resolveDefault(f.default, unit) : f.default;
+  for (const f of tool.fields) v[f.key] = f.kind === 'file' ? null : f.kind === 'length' ? resolveDefault(f.default, unit) : f.default;
   return v;
 }
 
@@ -146,7 +149,7 @@ function render(): void {
 }
 
 function renderTool(tool: Tool): HTMLElement {
-  if (tool.custom) return renderPeople(tool);
+  if (tool.custom) return tool.id === 'cutting' ? renderCutting(tool) : renderPeople(tool);
   const values = valuesFor(tool);
   const head = el('div', { class: 'tool-head' }, el('h2', { id: `tool-${tool.id}`, tabindex: '-1' }, tool.name), el('p', {}, tool.blurb));
   const form = el('form', { class: 'form', autocomplete: 'off' });
@@ -243,6 +246,25 @@ function renderTool(tool: Tool): HTMLElement {
       });
       inputs.set(f.key, input);
       wrapper.append(input, label);
+    } else if (f.kind === 'file') {
+      const input = el('input', { type: 'file', id, accept: f.accept });
+      const msg = el('span', { class: 'hint', id: `${id}-msg` });
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        file.text().then((text) => {
+          const r = f.onFile(text, file.name, values, state.unit);
+          for (const [k, val] of Object.entries(r.set)) {
+            values[k] = val;
+            const target = inputs.get(k);
+            const tf = tool.fields.find((x) => x.key === k);
+            if (target) target.value = typeof val === 'number' ? (tf?.kind === 'length' ? inputText(val, state.unit, tf.long) : String(val)) : String(val ?? '');
+          }
+          msg.textContent = r.message;
+          refresh();
+        });
+      });
+      wrapper.append(label, el('div', { class: 'file' }, el('label', { class: 'btn', for: id }, f.button), input), msg);
     } else if (f.kind === 'lines') {
       const area = el('textarea', { id, rows: '5', placeholder: f.placeholder ?? '', spellcheck: 'false' });
       area.value = String(values[f.key] ?? '');
@@ -378,7 +400,91 @@ function renderPeople(tool: Tool): HTMLElement {
     render();
   });
   wrap.append(el('h3', { class: 'sub' }, 'Or type someone in'), form);
+
+  // moving people between this browser and another: copy as text, paste it there
+  const transfer = el('div', { class: 'field wide' });
+  const copyBtn = el('button', { type: 'button', class: 'copy', id: 'people-copy' }, 'Copy people as text');
+  copyBtn.addEventListener('click', () => {
+    const text = JSON.stringify(state.people);
+    const done = () => { copyBtn.textContent = 'Copied'; setTimeout(() => { copyBtn.textContent = 'Copy people as text'; }, 1500); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => { paste.value = text; paste.select(); });
+    else { paste.value = text; paste.select(); }
+  });
+  const paste = el('textarea', { id: 'people-paste', rows: '2', placeholder: 'Paste what Copy gave you on the other device' });
+  const pasteBtn = el('button', { type: 'button', class: 'copy', id: 'people-paste-btn' }, 'Add pasted people');
+  pasteBtn.addEventListener('click', () => {
+    try {
+      const incoming = JSON.parse(paste.value) as Person[];
+      const ok = Array.isArray(incoming) ? incoming.filter((p) => p && typeof p.name === 'string' && p.measures && typeof p.measures === 'object') : [];
+      if (!ok.length) throw new Error('empty');
+      state.people = mergePeople(state.people, ok);
+      save(state);
+      render();
+    } catch {
+      paste.setAttribute('aria-invalid', 'true');
+    }
+  });
+  transfer.append(el('span', { class: 'label-text' }, 'Move people to a phone or another browser'), el('div', { class: 'file' }, copyBtn, pasteBtn), el('div', { class: 'control' }, paste));
+  wrap.append(transfer);
   wrap.append(el('ul', { class: 'notes' }, el('li', {}, 'Circle skirt, Elastic, Waistbands, Stretch and ease, and Cup size and FBA get a \u201cFill the body measurements from\u201d choice once someone is here.')));
+  return el('div', { class: 'tool' }, head, wrap);
+}
+
+function renderCutting(tool: Tool): HTMLElement {
+  const head = el('div', { class: 'tool-head' }, el('h2', { id: `tool-${tool.id}`, tabindex: '-1' }, tool.name), el('p', {}, tool.blurb));
+  const wrap = el('div', { class: 'people' });
+  const area = el('textarea', { id: 'cutting-text', rows: '6', placeholder: '6 Skirt Front C1MOF \u00d71\n7 Skirt Back C2M \u00d72\nPocket \u00d72', spellcheck: 'false' });
+  area.value = state.cutting.text;
+  const file = el('input', { type: 'file', id: 'cutting-file', accept: '.txt,text/plain' });
+  file.addEventListener('change', () => {
+    const f = file.files?.[0];
+    if (f) f.text().then((text) => { area.value = text; apply(); });
+  });
+  const apply = () => {
+    state.cutting.text = area.value;
+    const names = new Set(parseCutList(area.value).map((i) => i.name));
+    for (const k of Object.keys(state.cutting.done)) if (!names.has(k)) delete state.cutting.done[k];
+    save(state);
+    drawList();
+  };
+  area.addEventListener('input', apply);
+  wrap.append(el('div', { class: 'field wide' }, el('label', { for: 'cutting-text' }, 'Pieces to cut'), el('div', { class: 'control' }, area),
+    el('div', { class: 'file' }, el('label', { class: 'btn', for: 'cutting-file' }, 'Choose a cut list (.txt)\u2026'), file),
+    el('span', { class: 'hint' }, 'In Grain-Nest: Export \u2192 Cut list (text). Or type the pieces, one a line, with \u00d72 for how many.')));
+  const list = el('div', { class: 'cutlist', id: 'cutlist' });
+  wrap.append(list);
+  const drawList = () => {
+    list.replaceChildren();
+    const items = parseCutList(area.value);
+    if (!items.length) {
+      list.append(el('p', { class: 'empty' }, 'Nothing to cut yet.'));
+      return;
+    }
+    const total = items.reduce((a, i) => a + i.count, 0);
+    const done = items.reduce((a, i) => a + Math.min(i.count, state.cutting.done[i.name] ?? 0), 0);
+    const bar = el('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': String(done), 'aria-valuemax': String(total) }, el('div', { class: 'progress-fill', style: `width:${total ? (100 * done) / total : 0}%` }));
+    const reset = el('button', { type: 'button', class: 'link', id: 'cutting-reset' }, 'Untick all');
+    reset.addEventListener('click', () => { state.cutting.done = {}; save(state); drawList(); });
+    list.append(el('div', { class: 'progress-row' }, el('strong', { id: 'cutting-progress' }, `${done} of ${total} cut`), reset), bar);
+    for (const item of items) {
+      const row = el('div', { class: `cut-item${(state.cutting.done[item.name] ?? 0) >= item.count ? ' done' : ''}` });
+      const boxes = el('div', { class: 'cut-boxes' });
+      for (let k = 0; k < item.count; k++) {
+        const cb = el('input', { type: 'checkbox', 'aria-label': `${item.name} ${k + 1} of ${item.count}` });
+        cb.checked = (state.cutting.done[item.name] ?? 0) > k;
+        cb.addEventListener('change', () => {
+          const current = state.cutting.done[item.name] ?? 0;
+          state.cutting.done[item.name] = cb.checked ? Math.max(current, k + 1) : Math.min(current, k);
+          save(state);
+          drawList();
+        });
+        boxes.append(cb);
+      }
+      row.append(el('span', { class: 'cut-name' }, item.name, item.count > 1 ? el('span', { class: 'cut-count' }, ` \u00d7${item.count}`) : null), boxes);
+      list.append(row);
+    }
+  };
+  drawList();
   return el('div', { class: 'tool' }, head, wrap);
 }
 
@@ -394,6 +500,7 @@ function fieldText(f: Field, values: Values, unit: Unit): string | null {
     case 'check': return v ? 'yes' : 'no';
     case 'text': return typeof v === 'string' && v ? v : null;
     case 'lines': return typeof v === 'string' && v ? '\n  ' + v.trim().split('\n').join('\n  ') : null;
+    case 'file': return null;
   }
 }
 

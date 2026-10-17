@@ -9,6 +9,7 @@ import { parsePieces, yardage } from './calc/yardage';
 import { searchPressing } from './calc/pressing';
 import { searchFinishes } from './calc/finishes';
 import { searchBurn } from './calc/burn';
+import { piecesFromSvg } from './svgfiles';
 import { CM_PER_IN, formatBuy, formatLength, formatPercent, fromUnit } from './units';
 import { SA, WIDTH, bool, num, pct, str, type Output, type Tool, type Values } from './framework';
 
@@ -217,6 +218,15 @@ export const MORE_TOOLS: Tool[] = [
     blurb: 'A quick fabric estimate from the sizes of the pieces, for a pattern with no envelope figure. Area plus waste, not a layout.',
     fields: [
       { key: 'pieces', kind: 'lines', label: 'Pieces, one a line: width × height × how many', default: 'front 60 × 80 × 1\nback 60 × 80 × 1\nsleeve 40 × 60 × 2\nfacing 30 × 10 × 2', placeholder: 'front 60 x 80 x1', wide: true, hint: 'The box round each piece, in the unit switched on. A piece cut on the fold is its full opened width.' },
+      { key: 'fabric', kind: 'select', label: 'Fabric in the cut codes', default: 'M', options: [{ value: 'M', label: 'M \u2013 main' }, { value: 'L', label: 'L \u2013 lining' }, { value: 'I', label: 'I \u2013 interfacing' }, { value: 'C', label: 'C \u2013 contrast' }], hint: 'Which pieces to read from a pattern SVG.' },
+      { key: 'svg', kind: 'file', label: 'Or read the pieces from a pattern SVG', accept: '.svg,image/svg+xml', button: 'Choose an SVG\u2026', hint: 'Grain-Nest style names (\u201c7 Skirt Back C2M\u201d, \u201c1 Front C1MOF\u201d): the box round each piece, opened out if on the fold, counted for the fabric chosen.', onFile: (text, name, v, unit): { set: Values; message: string } => {
+        const pieces = piecesFromSvg(text, str(v, 'fabric') || 'M');
+        if (!pieces) return { set: {}, message: `${name} is not an SVG that can be read.` };
+        if (!pieces.length) return { set: {}, message: `No pieces for fabric ${str(v, 'fabric') || 'M'} in ${name}: the groups need names ending in cut codes like C2M.` };
+        const fmt = (cm: number) => (unit === 'in' ? (cm / CM_PER_IN).toFixed(1) : cm.toFixed(1)).replace(/\.0$/, '');
+        const lines = pieces.map((p) => `${p.name} ${fmt(p.width)} \u00d7 ${fmt(p.height)} \u00d7 ${p.count}`).join('\n');
+        return { set: { pieces: lines }, message: `${name}: ${pieces.length} pieces read.` };
+      } },
       { key: 'width', kind: 'length', label: 'Fabric width', default: WIDTH },
       { key: 'waste', kind: 'percent', label: 'Waste', default: 20, hint: '15% for simple shapes, 25% for curves and many small pieces, more for a one-way print.' },
     ],
@@ -282,6 +292,15 @@ export const MORE_TOOLS: Tool[] = [
         notes: ['Natural fibres leave ash; synthetics leave a bead. Cellulose smells of paper, protein of hair. Do this over a sink, with a lid to hand.'],
       };
     },
+  },
+  {
+    id: 'cutting',
+    name: 'Cutting list',
+    group: 'Cutting',
+    blurb: 'Tick pieces off as you cut them. Paste a Grain-Nest cut list, or any list with \u00d72 after a name; it stays ticked on this device.',
+    fields: [],
+    custom: true,
+    compute: () => ({}),
   },
   {
     id: 'people',

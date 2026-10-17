@@ -15,6 +15,7 @@ import { allowanceChange, finishedFromFlat } from './calc/allowance';
 import { CM_PER_IN, formatBuy, formatLength, formatPercent } from './units';
 import { SA, SA_NARROW, WIDTH, WIDTH_NARROW, bool, num, pct, str, type Output, type Tool, type UnitDefault, type Values } from './framework';
 import { MORE_TOOLS } from './tools-more';
+import { seamsFromSvg } from './svgfiles';
 
 export type { Cell, Field, Group, Output, Tool, UnitDefault, Value, Values } from './framework';
 export { GROUPS } from './framework';
@@ -104,6 +105,7 @@ const BASE_TOOLS: Tool[] = [
         rows: [
           { label: 'Hem radius, cut edge', value: L(r.outerRadius) },
           { label: 'Finished hem length', value: formatLength(r.hemLength, unit, { long: true }), sub: 'For hem tape, bias facing or a rolled hem.' },
+          { label: 'Extra in the hem allowance to ease in', value: L(r.hemEase), sub: 'The raw edge is longer than the hem line by this much, spread round the hem. Keep the hem narrow or use a bias facing.' },
         ],
         notes: [
           'Let the skirt hang for a day before hemming: the bias parts drop.',
@@ -436,6 +438,11 @@ const BASE_TOOLS: Tool[] = [
     blurb: 'How much thread the seams of a project use, by stitch, and whether the spool will last.',
     fields: [
       { key: 'seams', kind: 'length', long: true, label: 'Seams to sew', default: { cm: 1000, in: 11 * 36 }, hint: TYPICAL_SEAMS.map((t) => `${t.name} ${t.length / 100} m`).join(', ') + '.' },
+      { key: 'svg', kind: 'file', label: 'Or read the seams from a Grain-Nest export', accept: '.svg,image/svg+xml', button: 'Choose an SVG\u2026', wide: true, hint: 'Adds up the sew lines in the layout and halves them, since a seam joins two edges. Hems and topstitching are extra.', onFile: (text, name, _v, unit): { set: Values; message: string } => {
+        const r = seamsFromSvg(text);
+        if (!r) return { set: {}, message: `Could not find sew lines or cutting lines in ${name}.` };
+        return { set: { seams: r.seams }, message: `${name}: ${r.pieces} ${r.source === 'sew' ? 'sew lines' : 'cutting lines (no sew lines in the file)'} read, ${formatLength(r.seams, unit, { long: true })} of seams.` };
+      } },
       { key: 'stitch', kind: 'select', label: 'Stitch', default: 'lock', options: STITCH_KINDS.map((k) => ({ value: k.id, label: k.name })), sets: (id) => ({ spool: id === 'lock' || id === 'zigzag' ? 100000 : 250000 }), hint: 'Changing the stitch resets the spool to a 1000 m reel or a 2500 m cone.' },
       { key: 'waste', kind: 'percent', label: 'Add for tails and unpicking', default: 15 },
       { key: 'spool', kind: 'length', long: true, label: 'Thread on a spool', default: { cm: 100000, in: 1094 * 36 }, hint: 'Sew-all spools are 100 m, 250 m or 1000 m; overlocker cones 2500 m or 3000 m.' },
