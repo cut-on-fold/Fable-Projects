@@ -56,6 +56,7 @@ TOTAL FABRIC NEEDED
   });
   it('reads a plain list', () => {
     expect(parseCutList('Front x2\nBack\nSleeve ×2\n\n')).toEqual([{ name: 'Front', count: 2 }, { name: 'Back', count: 1 }, { name: 'Sleeve', count: 2 }]);
+    expect(parseCutList('Box 2\nCuff max 2\nPocket×3')).toEqual([{ name: 'Box 2', count: 1 }, { name: 'Cuff max 2', count: 1 }, { name: 'Pocket', count: 3 }]);
   });
 });
 

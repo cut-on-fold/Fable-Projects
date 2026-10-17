@@ -136,7 +136,8 @@ describe('pleats', () => {
     expect(r.ratio).toBe(3);
     expect(r.marks[0]).toEqual({ position: 6.5, kind: 'fold' });
     expect(r.marks[1]).toEqual({ position: 16.5, kind: 'placement' });
-    expect(r.marks).toHaveLength(23);
+    expect(r.marks).toHaveLength(24);
+    expect(r.marks[23]).toEqual({ position: 181.5, kind: 'placement' });
   });
   it('box pleats mark placement, fold, fold, placement', () => {
     const r = pleats({ style: 'box', finishedWidth: 20, pleatWidth: 10, depth: 4, endAllowance: 0 })!;
@@ -147,8 +148,11 @@ describe('pleats', () => {
   });
   it('inverted pleats mark fold, placement, placement, fold', () => {
     const r = pleats({ style: 'inverted', finishedWidth: 10, pleatWidth: 10, depth: 3, endAllowance: 0 })!;
-    expect(r.marks.map((m) => m.kind)).toEqual(['fold', 'placement', 'placement', 'fold']);
-    expect(r.marks.map((m) => m.position)).toEqual([0, 3, 13, 16]);
+    expect(r.marks.map((m) => m.kind)).toEqual(['fold', 'placement', 'fold']);
+    expect(r.marks.map((m) => m.position)).toEqual([0, 3, 6]);
+    expect(r.pleated).toBe(16);
+    const two = pleats({ style: 'inverted', finishedWidth: 20, pleatWidth: 10, depth: 3, endAllowance: 0 })!;
+    expect(two.marks.map((m) => m.position)).toEqual([0, 3, 6, 16, 19, 22]);
   });
 });
 

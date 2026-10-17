@@ -26,7 +26,7 @@ export type Field =
   | (FieldBase & { kind: 'select'; default: string; options: Array<{ value: string; label: string }>; sets?: (value: string, unit: Unit) => Values })
   | (FieldBase & { kind: 'check'; default: boolean })
   | (FieldBase & { kind: 'text'; default: string; placeholder?: string })
-  | (FieldBase & { kind: 'lines'; default: string; placeholder?: string })
+  | (FieldBase & { kind: 'lines'; default: string; placeholder?: string; /** Rewrites the text when the unit changes, e.g. converting the numbers in it. */ convert?: (text: string, from: Unit, to: Unit) => string })
   | (FieldBase & { kind: 'file'; accept: string; button: string; /** Reads the file and says which values to set. */ onFile: (text: string, name: string, v: Values, unit: Unit) => { set: Values; message: string } });
 
 export interface Cell { text: string; cls?: string }

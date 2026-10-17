@@ -21,18 +21,19 @@ export interface Offer {
   price: number;
   per: string;
   width: number;
+  unit?: 'cm' | 'in';
 }
 
-/** Area of one unit in square metres. A fat quarter is half the width by half a metre (or yard). */
-export function unitArea(per: string, widthCm: number): number | null {
+/** Area of one unit in square metres. A fat quarter is half the width by half a metre, or half a yard in inches. */
+export function unitArea(per: string, widthCm: number, unit: 'cm' | 'in' = 'cm'): number | null {
   const sold = SOLD_PER.find((s) => s.id === per);
   if (!sold || !(widthCm > 0)) return null;
-  if (sold.length === null) return ((widthCm / 2) * 50) / 10000;
+  if (sold.length === null) return ((widthCm / 2) * (unit === 'in' ? 45.72 : 50)) / 10000;
   return (sold.length * widthCm) / 10000;
 }
 
 export function pricePerSquareMetre(o: Offer): number | null {
-  const area = unitArea(o.per, o.width);
+  const area = unitArea(o.per, o.width, o.unit ?? 'cm');
   if (area === null || !(o.price >= 0)) return null;
   return o.price / area;
 }

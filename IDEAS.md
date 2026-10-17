@@ -52,6 +52,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Thimble v0.5.1** — fixes from a code review: inverted pleat marks now
+      meet on one placement line; knife pleats keep their last placement line;
+      the yardage piece list follows the unit toggle; a fat quarter is a quarter
+      yard in inches; a cut-list name ending in a number keeps it; the bias
+      note's fat-quarter figure corrected to about 6 m.
 - [x] **Thimble v0.5.0** — Grain-Nest files: Thread reads the sew lines of an
       export SVG; Yardage estimate reads piece sizes and cut codes from a
       pattern SVG; a Cutting list with a box per copy from the cut list text.

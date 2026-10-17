@@ -61,16 +61,15 @@ export function pleats(i: PleatInput): PleatResult | null {
       x += i.depth;
       marks.push({ position: x, kind: 'placement' });
     } else {
-      // Inverted: the folds meet in the middle of the face.
+      // Inverted: the two folds meet on the placement line in the middle of
+      // the underlay, then the face lies flat before the next pleat.
       marks.push({ position: x, kind: 'fold' });
       x += i.depth;
       marks.push({ position: x, kind: 'placement' });
+      x += i.depth;
+      marks.push({ position: x, kind: 'fold' });
       x += face;
-      marks.push({ position: x, kind: 'placement' });
-      x += i.depth;
-      marks.push({ position: x, kind: 'fold' });
     }
   }
-  if (i.style === 'knife' && marks.length) marks.pop(); // the last pleat has nowhere to fold to beyond the run
   return { count, pleated, cutWidth, ratio, marks };
 }

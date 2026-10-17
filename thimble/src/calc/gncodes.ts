@@ -77,11 +77,13 @@ export function parseCutList(text: string): CutItem[] {
     if (/^total fabric/i.test(line)) break;
     if (/^(grain-nest cut list|generated:|pieces$|sheet \d|pieces placed:|length used:|utilisation:|total fabric|[=\-]{3,}|\(none placed\))/i.test(line)) continue;
     if (/^[\w ]+:\s*\S/.test(line) && !/[×x]\s*\d+$/i.test(line)) continue;
-    const m = /^(.*?)\s*(?:[×x]\s*(\d+))?$/i.exec(line);
+    // "×2" anywhere at the end; a plain "x2" only after a space, so "Box 2" keeps its name
+    const m = /^(.*?)(?:\s*×\s*(\d+)|\s+x\s*(\d+))?$/i.exec(line);
     if (!m) continue;
     const name = m[1]!.replace(/\.svg\b/i, '').replace(/\s+/g, ' ').trim();
     if (!name) continue;
-    items.push({ name, count: m[2] ? Math.max(1, parseInt(m[2], 10)) : 1 });
+    const n = m[2] ?? m[3];
+    items.push({ name, count: n ? Math.max(1, parseInt(n, 10)) : 1 });
   }
   return items;
 }

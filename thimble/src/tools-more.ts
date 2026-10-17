@@ -5,7 +5,7 @@ import { SOLD_PER, pricePerSquareMetre, priceFor } from './calc/price';
 import { waistband } from './calc/waistband';
 import { EASE_RANGES, sleeveCap } from './calc/sleeve';
 import { DRAFTED_FOR, bustAdjustment, cupSize } from './calc/bust';
-import { parsePieces, yardage } from './calc/yardage';
+import { convertPieces, parsePieces, yardage } from './calc/yardage';
 import { searchPressing } from './calc/pressing';
 import { searchFinishes } from './calc/finishes';
 import { searchBurn } from './calc/burn';
@@ -88,8 +88,8 @@ export const MORE_TOOLS: Tool[] = [
       { key: 'needWidth', kind: 'length', label: 'At a width of', default: WIDTH },
     ],
     compute(v, unit) {
-      const a = { price: num(v, 'priceA') ?? NaN, per: str(v, 'perA'), width: num(v, 'widthA') ?? 0 };
-      const b = { price: num(v, 'priceB') ?? NaN, per: str(v, 'perB'), width: num(v, 'widthB') ?? 0 };
+      const a = { price: num(v, 'priceA') ?? NaN, per: str(v, 'perA'), width: num(v, 'widthA') ?? 0, unit };
+      const b = { price: num(v, 'priceB') ?? NaN, per: str(v, 'perB'), width: num(v, 'widthB') ?? 0, unit };
       const pa = pricePerSquareMetre(a);
       const pb = pricePerSquareMetre(b);
       if (pa === null || pb === null) return { empty: 'Give a price and width for both fabrics.' };
@@ -217,7 +217,7 @@ export const MORE_TOOLS: Tool[] = [
     group: 'Buying',
     blurb: 'A quick fabric estimate from the sizes of the pieces, for a pattern with no envelope figure. Area plus waste, not a layout.',
     fields: [
-      { key: 'pieces', kind: 'lines', label: 'Pieces, one a line: width × height × how many', default: 'front 60 × 80 × 1\nback 60 × 80 × 1\nsleeve 40 × 60 × 2\nfacing 30 × 10 × 2', placeholder: 'front 60 x 80 x1', wide: true, hint: 'The box round each piece, in the unit switched on. A piece cut on the fold is its full opened width.' },
+      { key: 'pieces', kind: 'lines', label: 'Pieces, one a line: width × height × how many', default: 'front 60 × 80 × 1\nback 60 × 80 × 1\nsleeve 40 × 60 × 2\nfacing 30 × 10 × 2', placeholder: 'front 60 x 80 x1', wide: true, convert: (text, from, to) => (from === to ? text : convertPieces(text, to === 'in' ? 1 / CM_PER_IN : CM_PER_IN)), hint: 'The box round each piece, in the unit switched on. A piece cut on the fold is its full opened width.' },
       { key: 'fabric', kind: 'select', label: 'Fabric in the cut codes', default: 'M', options: [{ value: 'M', label: 'M \u2013 main' }, { value: 'L', label: 'L \u2013 lining' }, { value: 'I', label: 'I \u2013 interfacing' }, { value: 'C', label: 'C \u2013 contrast' }], hint: 'Which pieces to read from a pattern SVG.' },
       { key: 'svg', kind: 'file', label: 'Or read the pieces from a pattern SVG', accept: '.svg,image/svg+xml', button: 'Choose an SVG\u2026', hint: 'Grain-Nest style names (\u201c7 Skirt Back C2M\u201d, \u201c1 Front C1MOF\u201d): the box round each piece, opened out if on the fold, counted for the fabric chosen.', onFile: (text, name, v, unit): { set: Values; message: string } => {
         const pieces = piecesFromSvg(text, str(v, 'fabric') || 'M');

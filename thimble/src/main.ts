@@ -69,6 +69,10 @@ function switchUnit(next: Unit): void {
     const v = state.values[tool.id];
     if (!v) continue;
     for (const f of tool.fields) {
+      if (f.kind === 'lines' && f.convert && typeof v[f.key] === 'string') {
+        v[f.key] = f.convert(v[f.key] as string, prev, next);
+        continue;
+      }
       if (f.kind !== 'length') continue;
       const oldDefault = resolveDefault(f.default, prev);
       const cur = v[f.key];

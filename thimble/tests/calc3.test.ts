@@ -4,7 +4,7 @@ import { priceFor, pricePerSquareMetre, unitArea } from '../src/calc/price';
 import { waistband } from '../src/calc/waistband';
 import { EASE_RANGES, sleeveCap } from '../src/calc/sleeve';
 import { bustAdjustment, cupSize } from '../src/calc/bust';
-import { parsePieces, yardage } from '../src/calc/yardage';
+import { convertPieces, parsePieces, yardage } from '../src/calc/yardage';
 
 describe('weight', () => {
   it('converts gsm and oz', () => {
@@ -29,6 +29,7 @@ describe('price', () => {
     expect(unitArea('m', 150)).toBeCloseTo(1.5);
     expect(unitArea('yd', 112)).toBeCloseTo(1.0241);
     expect(unitArea('fq', 112)).toBeCloseTo(0.28);
+    expect(unitArea('fq', 44 * 2.54, 'in')).toBeCloseTo(0.2555, 3);
     expect(unitArea('nope', 112)).toBeNull();
   });
   it('a dearer price per metre can be cheaper per square metre', () => {
@@ -91,6 +92,10 @@ describe('yardage', () => {
       { w: 50, h: 80, count: 1 },
     ]);
     expect(p.bad).toEqual(['nonsense']);
+  });
+  it('rewrites a list between units, keeping names and counts', () => {
+    expect(convertPieces('front 60 × 80 × 2\nskirt 50x80', 1 / 2.54)).toBe('front 23.6 × 31.5 × 2\nskirt 19.7x31.5');
+    expect(convertPieces('a 10 × 20 × 3', 2.54)).toBe('a 25.4 × 50.8 × 3');
   });
   it('estimates a length and checks the widest piece', () => {
     const r = yardage([{ w: 60, h: 80, count: 2 }, { w: 30, h: 60, count: 2 }], 150, 0.15, 'cm')!;

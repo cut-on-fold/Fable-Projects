@@ -43,6 +43,22 @@ export function parsePieces(text: string, toCm: (n: number) => number): ParsedPi
   return { pieces, bad };
 }
 
+/** Rewrite the numbers in a pieces list from one unit to the other, keeping names and counts. */
+export function convertPieces(text: string, factor: number): string {
+  return text
+    .split(/\n/)
+    .map((line) => {
+      let seen = 0;
+      return line.replace(/\d+(?:[.,]\d+)?/g, (n) => {
+        seen++;
+        if (seen > 2) return n;
+        const v = parseFloat(n.replace(',', '.')) * factor;
+        return (Math.round(v * 10) / 10).toString();
+      });
+    })
+    .join('\n');
+}
+
 export interface YardageResult {
   /** Total area of the pieces in cm². */
   area: number;

@@ -70,7 +70,7 @@ const BASE_TOOLS: Tool[] = [
         const overlap = unit === 'in' ? 10 * CM_PER_IN : 25;
         out.rows!.push({ label: 'Binding to make for the edge', value: L(bindingNeeded(edge, overlap)), sub: `Edge plus ${formatLength(overlap, unit)} for the join.` });
       }
-      out.notes!.push('The estimate takes a tenth off for the diagonal joins and squaring up. A fat quarter gives about 3 m (3 yd) of 4 cm (1½ in) bias.');
+      out.notes!.push('The estimate takes a tenth off for the diagonal joins and squaring up. A fat quarter gives about 6 m (6½ yd) of 4 cm (1½ in) bias.');
       if (!out.headline && !out.rows!.length) return { empty: 'Give a piece size or a length wanted.' };
       return out;
     },
