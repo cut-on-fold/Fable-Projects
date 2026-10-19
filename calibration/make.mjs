@@ -8,6 +8,9 @@
 // Around that: a 1 cm grid, inch rulers along the top and left, a 5 cm square
 // in each corner, corner-to-corner diagonals and a 30 cm circle, so a wrong
 // scale, a keystone error or a skew shows up as a number you can measure.
+// The inch cards (unit: 'in') have the grid every inch, heavier every 6 and
+// 12, a 2 in square in each corner, an 8 in dashed square and a 12 in circle,
+// for a mat ruled in inches.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -39,25 +42,32 @@ export function wrap(text, chars) {
   return lines;
 }
 
-export function card({ width, height, name, purpose }) {
+export function card({ width, height, name, purpose, unit = 'cm' }) {
   const parts = [];
   const layer = (label, body) =>
     parts.push(`<g inkscape:groupmode="layer" inkscape:label="${esc(label)}" id="${esc(label.toLowerCase().replace(/\W+/g, '-'))}">\n${body}\n</g>`);
+  const inches = unit === 'in';
 
-  // ---- grid: 1 cm lines, heavier every 5 and 10 cm, numbered along the bottom and right in cm
+  // ---- grid: every cm, heavier every 5 and 10, numbered every 5 along the bottom and right;
+  //      or every inch, heavier every 6 and 12, numbered every 6
   {
+    const step = inches ? IN : 10;
+    const medium = inches ? 6 : 5;
+    const heavy = inches ? 12 : 10;
     const lines = [];
-    for (let x = 10; x < width; x += 10) {
-      const w = x % 100 === 0 ? 0.8 : x % 50 === 0 ? 0.5 : 0.25;
+    for (let i = 1; i * step < width - 1e-6; i++) {
+      const x = r(i * step);
+      const w = i % heavy === 0 ? 0.8 : i % medium === 0 ? 0.5 : 0.25;
       lines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="${GRID}" stroke-width="${w}"/>`);
-      if (x % 50 === 0) lines.push(`<text x="${x + 1.5}" y="${r(height - 2)}" font-size="4" fill="${GRID}">${x / 10}</text>`);
+      if (i % medium === 0) lines.push(`<text x="${r(x + 1.5)}" y="${r(height - 2)}" font-size="4" fill="${GRID}">${i}</text>`);
     }
-    for (let y = 10; y < height; y += 10) {
-      const w = y % 100 === 0 ? 0.8 : y % 50 === 0 ? 0.5 : 0.25;
+    for (let i = 1; i * step < height - 1e-6; i++) {
+      const y = r(i * step);
+      const w = i % heavy === 0 ? 0.8 : i % medium === 0 ? 0.5 : 0.25;
       lines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="${GRID}" stroke-width="${w}"/>`);
-      if (y % 50 === 0) lines.push(`<text x="${r(width - 6)}" y="${y - 1.5}" font-size="4" fill="${GRID}">${y / 10}</text>`);
+      if (i % medium === 0) lines.push(`<text x="${r(width - 6)}" y="${r(y - 1.5)}" font-size="4" fill="${GRID}">${i}</text>`);
     }
-    layer('Grid cm', lines.join('\n'));
+    layer(inches ? 'Grid in' : 'Grid cm', lines.join('\n'));
   }
 
   // ---- inch rulers along the top and the left edges
@@ -83,19 +93,22 @@ export function card({ width, height, name, purpose }) {
   {
     const cx = width / 2;
     const cy = height / 2;
-    const d = Math.min(300, width - 40, height - 40);
+    const d = Math.min(inches ? 12 * IN : 300, width - 40, height - 40);
     const items = [
       `<line x1="0" y1="0" x2="${width}" y2="${height}" stroke="${SEW}" stroke-width="0.5" stroke-dasharray="6 4"/>`,
       `<line x1="${width}" y1="0" x2="0" y2="${height}" stroke="${SEW}" stroke-width="0.5" stroke-dasharray="6 4"/>`,
     ];
     if (big) {
       items.push(`<circle cx="${cx}" cy="${cy}" r="${r(d / 2)}" fill="none" stroke="${SEW}" stroke-width="${LINE}"/>`);
-      items.push(`<text x="${cx}" y="${r(cy + d / 2 + 8)}" text-anchor="middle" font-size="5" fill="${SEW}">${d / 10} cm circle: should look round</text>`);
+      items.push(`<text x="${cx}" y="${r(cy + d / 2 + 8)}" text-anchor="middle" font-size="5" fill="${SEW}">${inches ? `${r(d / IN)} in` : `${d / 10} cm`} circle: should look round</text>`);
     }
     layer('Keystone', items.join('\n'));
   }
 
-  // ---- the squares to measure: 4 in at the centre inside 20 cm, 5 cm in each corner
+  // ---- the squares to measure: 4 in at the centre inside 20 cm (8 in), 5 cm (2 in) in each corner
+  const m = inches ? 0.5 * IN : 15;
+  const c = inches ? 2 * IN : 50;
+  const cornerLabel = inches ? '2 in' : '5 cm';
   {
     const cx = width / 2;
     const cy = height / 2;
@@ -104,27 +117,24 @@ export function card({ width, height, name, purpose }) {
     sq.push(`<rect id="calibration-square" inkscape:label="calibration-square" x="${r(cx - s4 / 2)}" y="${r(cy - s4 / 2)}" width="${r(s4)}" height="${r(s4)}" fill="none" stroke="${CUT}" stroke-width="${LINE}"/>`);
     sq.push(`<text id="calibration-label" x="${r(cx - s4 / 2)}" y="${r(cy - s4 / 2 - 4)}" font-size="6" fill="${CUT}">4 in (101.6 mm) square: measure to check the scale</text>`);
     if (big) {
-      sq.push(`<rect x="${r(cx - 100)}" y="${r(cy - 100)}" width="200" height="200" fill="none" stroke="${CUT}" stroke-width="${LINE}" stroke-dasharray="10 5"/>`);
-      sq.push(`<text x="${r(cx - 100)}" y="${r(cy + 100 + 8)}" font-size="6" fill="${CUT}">20 cm square</text>`);
+      const half = inches ? 4 * IN : 100;
+      sq.push(`<rect x="${r(cx - half)}" y="${r(cy - half)}" width="${r(2 * half)}" height="${r(2 * half)}" fill="none" stroke="${CUT}" stroke-width="${LINE}" stroke-dasharray="10 5"/>`);
+      sq.push(`<text x="${r(cx - half)}" y="${r(cy + half + 8)}" font-size="6" fill="${CUT}">${inches ? '8 in' : '20 cm'} square</text>`);
     }
-    const m = 15;
-    const c = 50;
     for (const [x, y] of [[m, m], [width - m - c, m], [m, height - m - c], [width - m - c, height - m - c]]) {
-      sq.push(`<rect x="${r(x)}" y="${r(y)}" width="${c}" height="${c}" fill="none" stroke="${CUT}" stroke-width="${LINE}"/>`);
-      sq.push(`<text x="${r(x + 3)}" y="${r(y + 8)}" font-size="5" fill="${CUT}">5 cm</text>`);
+      sq.push(`<rect x="${r(x)}" y="${r(y)}" width="${r(c)}" height="${r(c)}" fill="none" stroke="${CUT}" stroke-width="${LINE}"/>`);
+      sq.push(`<text x="${r(x + 3)}" y="${r(y + 8)}" font-size="5" fill="${CUT}">${cornerLabel}</text>`);
     }
     layer('Calibration', sq.join('\n'));
   }
 
   // ---- instructions, wrapped into the band that is free of squares
   {
-    const m = 15;
-    const c = 50;
     const paragraphs = [
       [`${name}: ${purpose}`, true],
       [big
-        ? 'Calibrate the projector, then measure the 4 in square at the centre and the 5 cm square in each corner. Centre right but corners differ: keystone. One side long: skew. Circle not round: both. Everything the same but wrong: scale.'
-        : 'Measure the 4 in square and the 5 cm corner squares. All wrong by the same amount: the printer is scaling. Corners differ: the paper slipped.', false],
+        ? `Calibrate the projector, then measure the 4 in square at the centre and the ${cornerLabel} square in each corner. Centre right but corners differ: keystone. One side long: skew. Circle not round: both. Everything the same but wrong: scale.`
+        : `Measure the 4 in square and the ${cornerLabel} corner squares. All wrong by the same amount: the printer is scaling. Corners differ: the paper slipped.`, false],
       [big ? 'Lines are 2 mm wide, like a Grain-Nest export. Measure to the middle of the line.' : 'Lines 2 mm wide, like a Grain-Nest export; measure to the middle.', false],
     ];
     // big cards: between the bottom corner squares; small ones: under the centre square, full width
@@ -161,8 +171,11 @@ ${parts.join('\n')}
 export const CARDS = [
   { file: 'projector-90x60cm.svg', width: 900, height: 600, name: 'Projector card 90 × 60 cm', purpose: 'the whole throw of a ceiling projector' },
   { file: 'projector-60x40cm.svg', width: 600, height: 400, name: 'Projector card 60 × 40 cm', purpose: 'a smaller throw, or the middle of the table' },
+  { file: 'projector-36x24in.svg', width: r(36 * IN), height: r(24 * IN), unit: 'in', name: 'Projector card 36 × 24 in', purpose: 'a large cutting mat ruled in inches' },
+  { file: 'projector-24x18in.svg', width: r(24 * IN), height: r(18 * IN), unit: 'in', name: 'Projector card 24 × 18 in', purpose: 'a medium cutting mat ruled in inches' },
   { file: 'print-a4.svg', width: 210, height: 297, name: 'Print card A4', purpose: 'print at 100% (no fit to page) to check a printer' },
   { file: 'print-letter.svg', width: r(8.5 * IN), height: r(11 * IN), name: 'Print card Letter', purpose: 'print at 100% (no fit to page) to check a printer' },
+  { file: 'print-letter-in.svg', width: r(8.5 * IN), height: r(11 * IN), unit: 'in', name: 'Print card Letter, inch grid', purpose: 'print at 100% (no fit to page) to check a printer against an inch ruler' },
 ];
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -170,6 +183,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   mkdirSync(out, { recursive: true });
   for (const c of CARDS) {
     writeFileSync(join(out, c.file), card(c));
-    console.log(`${c.file}  ${c.width} × ${c.height} mm`);
+    console.log(`${c.file}  ${c.width} × ${c.height} mm${c.unit === 'in' ? ' (inch grid)' : ''}`);
   }
 }

@@ -99,11 +99,14 @@ async function run(name, { dark }) {
 
   // Calibrate: starts with the corners; add columns; drag a corner and nudge it.
   if ((await page.getAttribute('#tab-calibrate', 'aria-pressed')) !== 'true') errors.push(`${name}: not calibrating at first`);
-  await page.click('#cols-more');
-  await page.click('#cols-more');
-  await page.click('#rows-more');
-  if ((await page.textContent('#cols')) !== '3' || (await page.textContent('#rows')) !== '2') errors.push(`${name}: columns/rows ${await page.textContent('#cols')}/${await page.textContent('#rows')}`);
-  if (!/every 30 cm/.test(await page.textContent('#cols-every'))) errors.push(`${name}: spacing ${await page.textContent('#cols-every')}`);
+  await page.click('#add-points'); // every 15 cm on a 90 × 60 cm table: 7 × 5 points
+  await page.waitForTimeout(50);
+  if (await page.isVisible('#add-points')) errors.push(`${name}: Add points did not turn into Corners only`);
+  if ((await page.textContent('#points')) !== '7 × 5 points') errors.push(`${name}: ${await page.textContent('#points')}`);
+  await page.fill('#spacing', '30');
+  await page.press('#spacing', 'Enter');
+  await page.waitForTimeout(50);
+  if ((await page.textContent('#points')) !== '4 × 3 points') errors.push(`${name}: after 30 cm, ${await page.textContent('#points')}`);
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));
   await page.waitForTimeout(250);
   let s = await stored();
@@ -122,20 +125,39 @@ async function run(name, { dark }) {
   s = await stored();
   const moved = s.calibrations[0].mesh.points[0];
   if (Math.round(moved.x - tl.x) !== 16 || Math.round(moved.y - tl.y) !== 35) errors.push(`${name}: corner drag gave ${JSON.stringify(moved)} from ${JSON.stringify(tl)}`);
-  if (s.calibrations[0].mesh.points.length !== 12) errors.push(`${name}: ${s.calibrations[0].mesh.points.length} points`);
+  if (s.calibrations[0].mesh.points.length !== 12 || s.calibrations[0].mesh.xs.join() !== '0,30,60,90') errors.push(`${name}: stored mesh ${JSON.stringify(s.calibrations[0].mesh.xs)} ${s.calibrations[0].mesh.points.length} points`);
   // the inner point sits where the corners' homography puts it: on the (bent) top edge between the corners
   await page.screenshot({ path: join(SHOTS, `${name}-calibrate.png`) });
 
   // Reload: the calibration is still there.
   await page.reload();
   await page.waitForTimeout(400);
-  if ((await page.textContent('#cols')) !== '3') errors.push(`${name}: columns lost on reload`);
+  if ((await page.textContent('#points')) !== '4 × 3 points') errors.push(`${name}: points lost on reload`);
 
-  // Inches relabel the spacing and the size boxes.
+  // Inches: a 35 × 24 in mat with points every 6 in gets a short last column, and whole-inch labels.
   await page.click('#unit-in');
   await page.waitForTimeout(50);
-  if (!/every 11 3\/4 in/.test(await page.textContent('#cols-every'))) errors.push(`${name}: inch spacing ${await page.textContent('#cols-every')}`);
+  if ((await page.inputValue('#spacing')) !== '11 13/16') errors.push(`${name}: inch spacing ${await page.inputValue('#spacing')}`);
+  await page.fill('#table-width', '35');
+  await page.press('#table-width', 'Enter');
+  await page.fill('#table-height', '24');
+  await page.press('#table-height', 'Enter');
+  await page.fill('#spacing', '6');
+  await page.press('#spacing', 'Enter');
+  await page.waitForTimeout(250);
+  s = await stored();
+  const inches = s.calibrations[0].mesh.xs.map((x) => Math.round((x / 2.54) * 100) / 100).join();
+  if (inches !== '0,6,12,18,24,30,35') errors.push(`${name}: inch columns ${inches}`);
+  if ((await page.textContent('#points')) !== '7 × 5 points') errors.push(`${name}: inch points ${await page.textContent('#points')}`);
+  await page.screenshot({ path: join(SHOTS, `${name}-inches.png`) });
   await page.click('#unit-cm');
+  await page.fill('#table-width', '90');
+  await page.press('#table-width', 'Enter');
+  await page.fill('#table-height', '60');
+  await page.press('#table-height', 'Enter');
+  await page.fill('#spacing', '30');
+  await page.press('#spacing', 'Enter');
+  await page.waitForTimeout(100);
 
   // Project: the welcome card, then a PDF drawn through WebGL.
   await page.click('#tab-project');
