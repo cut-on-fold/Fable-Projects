@@ -271,7 +271,9 @@ function buildBar(): void {
       { class: 'group' },
       stepper('Columns', colsOut, colsEvery, () => step(-1, 0), () => step(1, 0), 'cols'),
       stepper('Rows', rowsOut, rowsEvery, () => step(0, -1), () => step(0, 1), 'rows'),
-      btn('Corners only', { id: 'reset-corners', title: 'Forget the inner points and go back to four corners', onclick: () => { setMesh(resetToCorners(mesh())); selected = { i: 0, j: 0 }; buildBar(); } }),
+      m.cols === 1 && m.rows === 1
+        ? btn('Add points', { id: 'add-points', class: 'btn primary', title: 'Put a point every 30 cm or so between the corners, to drag where the table is out', onclick: () => { const mm = mesh(); setMesh(resample(mm, Math.max(2, Math.round(mm.width / 30)), Math.max(2, Math.round(mm.height / 30))), false); buildBar(); } })
+        : btn('Corners only', { id: 'reset-corners', title: 'Forget the inner points and go back to four corners', onclick: () => { setMesh(resetToCorners(mesh())); selected = { i: 0, j: 0 }; buildBar(); } }),
     );
 
     const manage = el(
@@ -360,8 +362,8 @@ function refreshHint(): void {
   } else if (state.mode === 'calibrate') {
     hint.textContent =
       m.cols === 1 && m.rows === 1
-        ? 'Go full screen, then drag the four corners onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. If the middle is still out, add columns and rows and drag the inner points onto the crossings they are labelled with. Arrow keys nudge the selected point; [ and ] pick the next one; H hides these tools if a corner is under them.'
-        : 'Drag each inner point until it sits on the mat crossing it is labelled with. Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected point (Shift for 10 px, Alt for ¼ px); [ and ] pick the next one.'
+        ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points (or + beside Columns and Rows). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; [ and ] pick the next one; H hides these tools if a corner is under them.'
+        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); [ and ] pick the next one. + and − beside Columns and Rows change how many there are.'
   } else {
     hint.textContent = doc
       ? 'Drag to move the pattern. Arrow keys move it 1 cm (Shift 10 cm, Alt 1 mm). The picture bends with the calibration, so a dip in the table is already allowed for.'
@@ -685,7 +687,7 @@ function draw(): void {
         const p = pointAt(m, i, j);
         const isSel = !!selected && selected.i === i && selected.j === j;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, isSel ? 10 : 8, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, isSel ? 13 : 11, 0, Math.PI * 2);
         ctx.fillStyle = isSel ? chalk : state.invert ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
         ctx.fill();
         ctx.lineWidth = 2;
@@ -733,7 +735,8 @@ function draw(): void {
 
 // ---------- pointer and keys
 
-const HANDLE_RADIUS = 18;
+/** How close a press has to be to a circle to pick it up, in CSS px: generous for a trackpad or a finger. */
+const HANDLE_RADIUS = 28;
 
 stage.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 && e.pointerType === 'mouse') return;

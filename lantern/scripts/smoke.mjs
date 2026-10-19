@@ -99,9 +99,8 @@ async function run(name, { dark }) {
 
   // Calibrate: starts with the corners; add columns; drag a corner and nudge it.
   if ((await page.getAttribute('#tab-calibrate', 'aria-pressed')) !== 'true') errors.push(`${name}: not calibrating at first`);
-  await page.click('#cols-more');
-  await page.click('#cols-more');
-  await page.click('#rows-more');
+  await page.click('#add-points'); // 3 × 2 on a 90 × 60 cm table
+  if (await page.isVisible('#add-points')) errors.push(`${name}: Add points did not turn into Corners only`);
   if ((await page.textContent('#cols')) !== '3' || (await page.textContent('#rows')) !== '2') errors.push(`${name}: columns/rows ${await page.textContent('#cols')}/${await page.textContent('#rows')}`);
   if (!/every 30 cm/.test(await page.textContent('#cols-every'))) errors.push(`${name}: spacing ${await page.textContent('#cols-every')}`);
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));

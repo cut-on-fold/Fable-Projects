@@ -20,9 +20,11 @@ is labelled with, so the picture bends to follow the surface.
    four corners onto its corners. The grid is every centimetre (or inch) and
    numbered every 10 cm (12 in); the dashed diagonals are straight on a flat
    table.
-2. If the inner lines do not land on the mat's lines, add **Columns** and
-   **Rows** until a point falls where the trouble is (the spacing is shown:
-   "every 15 cm"), then drag that point onto the mat crossing it is labelled
+2. If the inner lines do not land on the mat's lines: a fresh table has no
+   inner points, only the four corners. Press **Add points** (a point every
+   30 cm or so), or **+** beside **Columns** and **Rows** until a point falls
+   where the trouble is (the spacing is shown: "every 15 cm"). Circles appear
+   at the new crossings; drag each one onto the mat crossing it is labelled
    with. Arrow keys nudge the selected point a pixel at a time; `[` and `]`
    pick the next one. **Corners only** forgets the inner points.
 3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
