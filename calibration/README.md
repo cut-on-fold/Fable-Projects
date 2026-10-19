@@ -30,6 +30,7 @@ In [cards/](cards/), ready to use:
 |---|---|---|
 | `projector-90x60cm.svg` | 90 × 60 cm | The whole throw of a ceiling projector |
 | `projector-60x40cm.svg` | 60 × 40 cm | A smaller throw, or the middle of the table |
+| `projector-53x35in.svg` | 53 × 35 in | The whole throw over a cutting table ruled in inches |
 | `projector-36x24in.svg` | 36 × 24 in | A large cutting mat ruled in inches |
 | `projector-24x18in.svg` | 24 × 18 in | A medium mat ruled in inches |
 | `print-a4.svg` | A4 | Printing at 100% to check a printer |
