@@ -22,11 +22,14 @@ is labelled with, so the picture bends to follow the surface.
    table.
 2. If the inner lines do not land on the mat's lines: a fresh table has no
    inner points, only the four corners. Press **Add points** (a point every
-   30 cm or so), or **+** beside **Columns** and **Rows** until a point falls
-   where the trouble is (the spacing is shown: "every 15 cm"). Circles appear
-   at the new crossings; drag each one onto the mat crossing it is labelled
-   with. Arrow keys nudge the selected point a pixel at a time; `[` and `]`
-   pick the next one. **Corners only** forgets the inner points.
+   15 cm or 6 in), or type how far apart you want them in **Points every**.
+   Points are counted from the top-left corner in whole steps, so with 6 in
+   on a 35 in mat they sit at 6, 12, 18, 24, 30 and then the far edge at 35,
+   each on a line of the mat; the last cell is just shorter. Circles appear
+   at the crossings, labelled with their distance from the corner; drag each
+   one onto that crossing on the mat. Arrow keys nudge the selected point a
+   pixel at a time; `[` and `]` pick the next one. **Corners only** forgets
+   the inner points.
 3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
    `,` and `.` for 1°), flip it (`F` across, `V` down), invert for white lines
    on black (`I`), thicken the lines, pick the size layer, hide the tools
@@ -55,8 +58,10 @@ corner, so you can drag it onto the right spot on the tape.
 ## How it works
 
 `src/calc/homography.ts` is the four-corner map. `src/calc/mesh.ts` is the
-mesh: the corners' homography plus a nudge per inner point, blended bilinearly
-inside each cell, so adding points changes nothing until one is moved;
+mesh: column and row positions chosen to land on the mat's lines (the last
+cell takes what is left), the corners' homography plus a nudge per inner
+point, blended bilinearly inside each cell, so adding points changes nothing
+until one is moved;
 `screenToTable` inverts it with Newton's method so dragging the pattern works
 in table centimetres on a bent table too. `src/calc/placement.ts` is where
 the page sits (centre, turn, flip, scale). `src/render.ts` draws the page

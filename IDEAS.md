@@ -48,9 +48,9 @@ like to know:
 - [ ] **Stitching multi-page PDFs** — tiled home-print patterns laid out into
       one sheet, the way Pattern Projector does; Lantern opens one page at a
       time, which is fine for copyshop A0 files.
-- [ ] **A point where the trouble is** — the mesh is a regular grid, so a dip
-      in one corner means adding a whole column; a point dropped anywhere
-      would be lighter.
+- [ ] **A point where the trouble is** — the mesh is a grid at one spacing,
+      so a dip in one corner means a whole column of points; a point dropped
+      anywhere would be lighter.
 - [ ] **Measure tool** — click two points on the table and read the distance,
       to check the calibration on the fabric without a tape.
 - [ ] **Mark and annotate** — a line snapped onto a grainline or a fold, kept

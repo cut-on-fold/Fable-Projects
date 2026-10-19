@@ -1,8 +1,8 @@
 import './styles.css';
 import type { Pt } from './calc/homography';
 import {
-  foldedCells, gridLines, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, resample, resetToCorners, screenToTable,
-  tablePointAt, tableToScreen, triangulate, withPoint, withSize, type Mesh,
+  cellLines, cols, foldedCells, gridLines, isCornersOnly, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, rows, screenToTable,
+  spacing, tablePointAt, tableToScreen, triangulate, withPoint, withSize, withSpacing, type Mesh,
 } from './calc/mesh';
 import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement, rotated, tableToPage, type PageSize, type Placement } from './calc/placement';
 import { openFile, type Opened } from './document';
@@ -236,6 +236,7 @@ function buildBar(): void {
       heightBox.setAttribute('aria-invalid', String(!(h && h > 0)));
       if (w && h && w > 0 && h > 0 && (w !== mesh().width || h !== mesh().height)) {
         setMesh(withSize(mesh(), w, h));
+        selected = { i: 0, j: 0 };
         refreshSpacing();
       }
     };
@@ -243,37 +244,34 @@ function buildBar(): void {
     heightBox.addEventListener('change', onSize);
     const sizeGroup = el('div', { class: 'group' }, el('label', {}, 'Size', widthBox, '×', heightBox, el('span', { text: state.unit })));
 
-    const colsOut = el('output', { id: 'cols', text: String(m.cols) });
-    const rowsOut = el('output', { id: 'rows', text: String(m.rows) });
-    const colsEvery = el('small', { id: 'cols-every' });
-    const rowsEvery = el('small', { id: 'rows-every' });
+    // Points every so many centimetres or inches from the top-left corner, so each lands on a mat line.
+    const defaultStep = state.unit === 'in' ? 6 * CM_PER_IN : 15;
+    const stepBox = el('input', { type: 'text', id: 'spacing', inputmode: 'decimal', value: spacing(m) === null ? '' : inputText(spacing(m), state.unit), placeholder: inputText(defaultStep, state.unit), 'aria-label': 'Space between points' });
+    const count = el('small', { id: 'points' });
     const refreshSpacing = () => {
       const mm = mesh();
-      colsOut.textContent = String(mm.cols);
-      rowsOut.textContent = String(mm.rows);
-      colsEvery.textContent = `every ${fmtCm(mm.width / mm.cols)}`;
-      rowsEvery.textContent = `every ${fmtCm(mm.height / mm.rows)}`;
+      count.textContent = isCornersOnly(mm) ? 'corners only' : `${mm.xs.length} × ${mm.ys.length} points`;
+      const addOrReset = document.getElementById('add-points') ?? document.getElementById('reset-corners');
+      if (addOrReset && (addOrReset.id === 'add-points') !== isCornersOnly(mm)) buildBar();
     };
-    refreshSpacing();
-    const step = (dc: number, dr: number) => {
-      const mm = mesh();
-      const cols = Math.max(1, Math.min(12, mm.cols + dc));
-      const rows = Math.max(1, Math.min(12, mm.rows + dr));
-      if (cols === mm.cols && rows === mm.rows) return;
-      setMesh(resample(mm, cols, rows), false);
-      if (selected && (selected.i > cols || selected.j > rows)) selected = { i: 0, j: 0 };
+    const applyStep = (step: number) => {
+      setMesh(withSpacing(mesh(), step), false);
+      selected = { i: 0, j: 0 };
       refreshSpacing();
     };
-    const stepper = (label: string, out: HTMLOutputElement, every: HTMLElement, dec: () => void, inc: () => void, id: string) =>
-      el('label', {}, label, el('div', { class: 'stepper' }, el('button', { type: 'button', id: `${id}-less`, 'aria-label': `Fewer ${label.toLowerCase()}`, onclick: dec }, '−'), out, el('button', { type: 'button', id: `${id}-more`, 'aria-label': `More ${label.toLowerCase()}`, onclick: inc }, '+'), every));
+    stepBox.addEventListener('change', () => {
+      const step = stepBox.value.trim() === '' ? 0 : parseLength(stepBox.value, state.unit);
+      stepBox.setAttribute('aria-invalid', String(step === null || step < 0));
+      if (step !== null && step >= 0) applyStep(step);
+    });
+    refreshSpacing();
     const pointsGroup = el(
       'div',
       { class: 'group' },
-      stepper('Columns', colsOut, colsEvery, () => step(-1, 0), () => step(1, 0), 'cols'),
-      stepper('Rows', rowsOut, rowsEvery, () => step(0, -1), () => step(0, 1), 'rows'),
-      m.cols === 1 && m.rows === 1
-        ? btn('Add points', { id: 'add-points', class: 'btn primary', title: 'Put a point every 30 cm or so between the corners, to drag where the table is out', onclick: () => { const mm = mesh(); setMesh(resample(mm, Math.max(2, Math.round(mm.width / 30)), Math.max(2, Math.round(mm.height / 30))), false); buildBar(); } })
-        : btn('Corners only', { id: 'reset-corners', title: 'Forget the inner points and go back to four corners', onclick: () => { setMesh(resetToCorners(mesh())); selected = { i: 0, j: 0 }; buildBar(); } }),
+      el('label', { title: 'Points this far apart, counted from the top-left corner; the last cell takes what is left' }, 'Points every', stepBox, el('span', { text: state.unit }), count),
+      isCornersOnly(m)
+        ? btn('Add points', { id: 'add-points', class: 'btn primary', title: 'Put a point every 15 cm or 6 in between the corners, to drag where the table is out', onclick: () => { stepBox.value = inputText(defaultStep, state.unit); applyStep(defaultStep); } })
+        : btn('Corners only', { id: 'reset-corners', title: 'Forget the inner points and go back to four corners', onclick: () => { stepBox.value = ''; applyStep(0); } }),
     );
 
     const manage = el(
@@ -361,9 +359,9 @@ function refreshHint(): void {
     hint.textContent = `This table was calibrated in a ${info!.w} × ${info!.h} ${info!.full ? 'full-screen ' : ''}window; this one is ${now.w} × ${now.h}${now.full ? ' full screen' : ''}. Go full screen the same way, or calibrate again.`;
   } else if (state.mode === 'calibrate') {
     hint.textContent =
-      m.cols === 1 && m.rows === 1
-        ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points (or + beside Columns and Rows). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; [ and ] pick the next one; H hides these tools if a corner is under them.'
-        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); [ and ] pick the next one. + and − beside Columns and Rows change how many there are.'
+      isCornersOnly(m)
+        ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points, or type how far apart you want them (6 in lands on a mat’s inch lines). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; [ and ] pick the next one; H hides these tools if a corner is under them.'
+        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); [ and ] pick the next one. Points every sets how far apart they are.'
   } else {
     hint.textContent = doc
       ? 'Drag to move the pattern. Arrow keys move it 1 cm (Shift 10 cm, Alt 1 mm). The picture bends with the calibration, so a dip in the table is already allowed for.'
@@ -659,10 +657,7 @@ function draw(): void {
     // the mesh's own cell lines, heavier, and the table edge
     ctx.strokeStyle = accent;
     ctx.lineWidth = 2;
-    for (const line of gridLines(m, Math.min(m.width / m.cols, m.height / m.rows))) {
-      const onCell = line.vertical ? isMultiple(line.at, m.width / m.cols) : isMultiple(line.at, m.height / m.rows);
-      if (onCell) polyline(line.points);
-    }
+    for (const line of cellLines(m)) polyline(line.points);
     ctx.lineWidth = 3;
     for (const line of gridLines(m, Math.max(m.width, m.height))) polyline(line.points);
     // diagonals: on a flat table they are straight
@@ -682,8 +677,8 @@ function draw(): void {
     // handles with their table position
     ctx.font = '12px Atkinson Hyperlegible, sans-serif';
     ctx.textBaseline = 'middle';
-    for (let j = 0; j <= m.rows; j++) {
-      for (let i = 0; i <= m.cols; i++) {
+    for (let j = 0; j <= rows(m); j++) {
+      for (let i = 0; i <= cols(m); i++) {
         const p = pointAt(m, i, j);
         const isSel = !!selected && selected.i === i && selected.j === j;
         ctx.beginPath();
@@ -701,8 +696,8 @@ function draw(): void {
         ctx.lineWidth = 1;
         ctx.stroke();
         const label = coords(tablePointAt(m, i, j));
-        const right = i < m.cols / 2;
-        const below = j < m.rows / 2;
+        const right = i < cols(m) / 2;
+        const below = j < rows(m) / 2;
         ctx.textAlign = right ? 'left' : 'right';
         const tx = p.x + (right ? 16 : -16);
         const ty = p.y + (below ? 14 : -14);
@@ -866,10 +861,10 @@ window.addEventListener('keydown', (e) => {
     case ']': {
       if (state.mode !== 'calibrate') break;
       const m = mesh();
-      const n = (m.cols + 1) * (m.rows + 1);
-      const cur = selected ? selected.j * (m.cols + 1) + selected.i : -1;
+      const n = m.xs.length * m.ys.length;
+      const cur = selected ? selected.j * m.xs.length + selected.i : -1;
       const next = (cur + (key === ']' ? 1 : n - 1) + n) % n;
-      selected = { i: next % (m.cols + 1), j: Math.floor(next / (m.cols + 1)) };
+      selected = { i: next % m.xs.length, j: Math.floor(next / m.xs.length) };
       redraw();
       break;
     }
