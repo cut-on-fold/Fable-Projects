@@ -36,6 +36,12 @@ is labelled with, so the picture bends to follow the surface.
    (`H`) and cut. **Grid** projects the calibration grid over the fabric to
    check the grain or the calibration; **Outline** shows the page edge.
 
+**Project the card** draws a [calibration card](../calibration/) the size of
+the table, with the grid in the unit you are using, and opens it as the
+pattern: every line should sit on a line of the mat, and the squares measure
+true with a tape. **Save card** writes the same card as an SVG, to project
+with Pattern Projector or to print.
+
 Each table keeps its own calibration (**New table** for Desk, Floor, …), and
 each remembers the window it was made in, so calibrate in full screen and
 project in full screen. If the window is a different size, the page says so.

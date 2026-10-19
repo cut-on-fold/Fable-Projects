@@ -69,6 +69,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.2.0** — points at a chosen spacing (every 6 in or 15 cm,
+      counted from the corner, so each sits on a mat line) instead of a
+      count; an Add points button; a calibration card for the current table
+      and unit, projected straight away or saved as an SVG; and the inch
+      calibration cards (53 × 35, 36 × 24, 24 × 18 in, Letter).
 - [x] **Lantern v0.1.0** — projector cutting with a calibration that bends: the
       four-corner homography plus a nudge per added point, blended inside each
       cell, so a dip in the desk or a bulge in the lens is dragged out at the

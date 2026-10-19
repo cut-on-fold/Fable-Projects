@@ -202,7 +202,21 @@ async function run(name, { dark }) {
   await page.waitForTimeout(100);
   await page.screenshot({ path: join(SHOTS, `${name}-grid.png`) });
 
-  // An SVG calibration card: six layers, one switched off.
+  // The card for this table, drawn in the page: the right size, opened as the pattern.
+  await page.click('#tab-calibrate');
+  await page.click('#project-card');
+  await page.waitForFunction(() => document.getElementById('open')?.textContent === 'calibration-card-90x60cm.svg', null, { timeout: 10000 }).catch(() => errors.push(`${name}: the table's card did not open`));
+  await page.waitForTimeout(400);
+  px = await inkPixels(page, false);
+  if (px.coloured < 2000) errors.push(`${name}: table card not drawn (${px.coloured} coloured px of ${px.drawn})`);
+  await page.screenshot({ path: join(SHOTS, `${name}-card.png`) });
+  // Saving it downloads an SVG of the same name.
+  await page.click('#tab-calibrate');
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#save-card')]);
+  if (!download || download.suggestedFilename() !== 'calibration-card-90x60cm.svg') errors.push(`${name}: save card gave ${download?.suggestedFilename()}`);
+  await page.click('#tab-project');
+
+  // An SVG calibration card from the repository: six layers, one switched off.
   await page.setInputFiles('#file', { name: 'projector-60x40cm.svg', mimeType: 'image/svg+xml', buffer: CARD });
   await page.waitForFunction(() => /Layers \(6\/6\)/.test(document.getElementById('layers')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => errors.push(`${name}: svg layers not listed`));
   await page.waitForTimeout(400);

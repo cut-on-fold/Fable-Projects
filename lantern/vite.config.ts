@@ -20,6 +20,8 @@ function serviceWorker(): Plugin {
 // bundled in, so the page can be saved and opened from a Mac with no server.
 export default defineConfig({
   base: './',
+  // The calibration card drawing is shared with calibration/make.mjs, one folder up.
+  server: { fs: { allow: ['..'] } },
   plugins: [viteSingleFile(), serviceWorker()],
   define: { __LANTERN_VERSION__: JSON.stringify(version) },
   build: { target: 'es2022', cssMinify: true, chunkSizeWarningLimit: 3000 },
