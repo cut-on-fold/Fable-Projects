@@ -43,6 +43,12 @@ with a tape. The layers (Grid cm or Grid in, Rulers in, Keystone, Calibration,
 Instructions, Border) can be switched off one at a time, so you can project
 just the grid onto fabric to check it is on grain before cutting.
 
+## Any other size
+
+Lantern draws one for whatever table it has: set the size and unit in
+Calibrate, then **Project the card** or **Save card**. That is the same
+drawing as these files, from `card.mjs`.
+
 ## Remaking them
 
 ```sh

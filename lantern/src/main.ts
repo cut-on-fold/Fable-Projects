@@ -6,6 +6,7 @@ import {
 } from './calc/mesh';
 import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement, rotated, tableToPage, type PageSize, type Placement } from './calc/placement';
 import { openFile, type Opened } from './document';
+import { card } from '../../calibration/card.mjs';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
 
@@ -280,6 +281,12 @@ function buildBar(): void {
       btn('New table', { id: 'cal-new', onclick: newCalibration }),
       btn('Delete', { id: 'cal-delete', disabled: state.calibrations.length < 2, onclick: deleteCalibration }),
     );
+    const cardGroup = el(
+      'div',
+      { class: 'group' },
+      btn('Project the card', { id: 'project-card', title: 'A calibration card the size of this table, to check the calibration on the mat with a tape', onclick: () => void loadFile(cardFile()) }),
+      btn('Save card', { id: 'save-card', title: 'The same card as an SVG, for Pattern Projector or to print', onclick: saveCard }),
+    );
     const view = el(
       'div',
       { class: 'group' },
@@ -289,7 +296,7 @@ function buildBar(): void {
       btn('?', { id: 'help', 'aria-label': 'Keys and help', onclick: () => togglePop('help') }),
     );
     const done = el('div', { class: 'group' }, btn('Project →', { id: 'go-project', class: 'btn primary', onclick: () => setMode('project') }));
-    bar.append(sizeGroup, pointsGroup, manage, view, el('div', { class: 'spacer' }), done);
+    bar.append(sizeGroup, pointsGroup, manage, cardGroup, view, el('div', { class: 'spacer' }), done);
     bar.append(el('p', { class: 'hint', id: 'hint' }));
   } else {
     const fileInput = el('input', { type: 'file', id: 'file', accept: '.pdf,.svg,application/pdf,image/svg+xml', hidden: true, onchange: () => fileInput.files?.[0] && loadFile(fileInput.files[0]) });
@@ -525,6 +532,32 @@ function rotateBy(deg: number): void {
 function recentre(): void {
   const m = mesh();
   setPlacement({ ...centred({ width: m.width, height: m.height }), scale: state.placement?.scale ?? 1 });
+}
+
+/** A calibration card the size of the current table, with the grid in the current unit. */
+function cardFile(): File {
+  const m = mesh();
+  const label = `${inputText(m.width, state.unit)} × ${inputText(m.height, state.unit)} ${state.unit}`;
+  const svg = card({
+    width: Math.round(m.width * 10 * 1000) / 1000,
+    height: Math.round(m.height * 10 * 1000) / 1000,
+    unit: state.unit,
+    name: `Calibration card ${label}`,
+    purpose: `${cal().name}, from Lantern`,
+  });
+  const slug = `${inputText(m.width, state.unit)}x${inputText(m.height, state.unit)}${state.unit}`.replace(/\s+/g, '').replace(/\//g, '-');
+  return new File([svg], `calibration-card-${slug}.svg`, { type: 'image/svg+xml' });
+}
+
+function saveCard(): void {
+  const file = cardFile();
+  const url = URL.createObjectURL(file);
+  const a = el('a', { href: url, download: file.name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(`Saved ${file.name}`);
 }
 
 function toggleFullscreen(): void {
