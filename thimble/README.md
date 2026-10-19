@@ -86,10 +86,9 @@ the version written in, so each release replaces the offline copy.
 
 ## Publishing
 
-`.github/workflows/thimble-pages.yml` builds the page and publishes it to
-GitHub Pages on every push to `main` that touches `thimble/`. The repository
-needs Pages switched on once: **Settings → Pages → Source: GitHub Actions**.
-The page is then at `https://cut-on-fold.github.io/Fable-Projects/`.
+`.github/workflows/pages.yml` builds the page and publishes it to GitHub
+Pages on every push to `main` that touches `thimble/`. It lives at
+<https://cut-on-fold.github.io/Fable-Projects/thimble/>.
 
 ## Where the rules of thumb come from
 
