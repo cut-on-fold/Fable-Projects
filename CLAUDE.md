@@ -16,10 +16,16 @@ one person, metric for fabric and inches for body measurements).
   draws them. Builds to one `dist/index.html` plus manifest, icons and a
   versioned service worker.
 - `bolt-end/` — printable labels from a Stash CSV export. Same stack.
+- `lantern/` — projector cutting with a bendable calibration. Same stack plus
+  pdf.js (legacy build, worker bundled) and WebGL 2. `src/calc/homography.ts`
+  is the four-corner map, `src/calc/mesh.ts` the mesh of nudges on top of it,
+  `src/calc/placement.ts` where the page sits; `src/render.ts` draws through
+  the mesh, `src/document.ts` opens PDFs and SVGs, `src/main.ts` is the page.
+  `scripts/smoke.mjs` clicks through the built page in headless Chromium.
 - `calibration/` — `make.mjs` writes the SVG test cards in `cards/`; CI checks
   the committed cards match the script.
 - `site/` — the landing page; the Pages workflow copies each project's `dist`
-  under it (`/thimble/`, `/bolt-end/`).
+  under it (`/thimble/`, `/bolt-end/`, `/lantern/`).
 - `IDEAS.md` — the running list; tick things off under Shipped with the
   version. `README.md` has the project table.
 

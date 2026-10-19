@@ -43,6 +43,23 @@ like to know:
 - [ ] **Hems in the thread estimate** — the export SVG gives seam lines; hems
       and topstitching are still a guess on top.
 
+## Lantern
+
+- [ ] **Stitching multi-page PDFs** — tiled home-print patterns laid out into
+      one sheet, the way Pattern Projector does; Lantern opens one page at a
+      time, which is fine for copyshop A0 files.
+- [ ] **A point where the trouble is** — the mesh is a regular grid, so a dip
+      in one corner means adding a whole column; a point dropped anywhere
+      would be lighter.
+- [ ] **Measure tool** — click two points on the table and read the distance,
+      to check the calibration on the fabric without a tape.
+- [ ] **Mark and annotate** — a line snapped onto a grainline or a fold, kept
+      with the placement.
+- [ ] **Camera calibration** — a phone photo of the projected grid on the mat
+      to place the points, instead of dragging each one.
+- [ ] **Shared calibrations** — export a table as a file so a second device
+      driving the same projector can use it.
+
 ## Other things
 
 - [ ] **Bolt End from Stash itself** — a "Print labels…" item in Stash that
@@ -52,6 +69,14 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.1.0** — projector cutting with a calibration that bends: the
+      four-corner homography plus a nudge per added point, blended inside each
+      cell, so a dip in the desk or a bulge in the lens is dragged out at the
+      point where it is; PDF (any page, layers) and SVG (Grain-Nest exports,
+      calibration cards, Inkscape layers) at true size through WebGL; move,
+      turn, flip, invert, line weight, grid over the fabric, several tables
+      each with its own calibration, installable and offline, a smoke test
+      in CI.
 - [x] **Bolt End v0.2.0** — Niimbot B21 labels: ten roll sizes and a custom
       size, each row drawn at 203 dpi, printed over Web Bluetooth from Chrome or
       Edge (darkness, copies) or saved as PNGs for the Niimbot app.

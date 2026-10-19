@@ -2,16 +2,16 @@ name: Tests
 
 on:
   push:
-    paths: ['thimble/**', 'bolt-end/**', 'calibration/**', '.github/workflows/tests.yml']
+    paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**', '.github/workflows/tests.yml']
   pull_request:
-    paths: ['thimble/**', 'bolt-end/**', 'calibration/**']
+    paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**']
 
 jobs:
   web:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [thimble, bolt-end]
+        project: [thimble, bolt-end, lantern]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -27,13 +27,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - name: Browser smoke test
-        if: matrix.project == 'thimble'
+        if: matrix.project == 'thimble' || matrix.project == 'lantern'
         run: npx playwright install --with-deps chromium && npm run smoke
       - uses: actions/upload-artifact@v5
-        if: matrix.project == 'thimble' && always()
+        if: (matrix.project == 'thimble' || matrix.project == 'lantern') && always()
         with:
-          name: thimble-smoke-shots
-          path: thimble/smoke-shots
+          name: ${{ matrix.project }}-smoke-shots
+          path: ${{ matrix.project }}/smoke-shots
           if-no-files-found: ignore
 
   calibration:

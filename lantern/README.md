@@ -1,0 +1,84 @@
+# Lantern
+
+Projector cutting for sewing patterns, with a calibration that bends. One web
+page: open a PDF pattern (or an SVG from Grain-Nest), it is drawn at true size
+through the calibration, drag it into place and cut. Nothing leaves the
+browser.
+
+The reason it exists: Pattern Projector's calibration is four corners, which
+is exactly right for a flat table at any tilt and nothing else. A desk that
+dips at one end, a floor that is not quite a plane, or a cheap projector lens
+that bulges the middle of the picture, all leave the middle of the grid out
+while the corners are perfect. Lantern starts with the same four corners and
+then lets you add points between them and drag each one onto the mat line it
+is labelled with, so the picture bends to follow the surface.
+
+## How to use it
+
+1. **Calibrate**, once per table. Put the size of your mat (or of a rectangle
+   you have taped out and measured) in the boxes, go full screen, and drag the
+   four corners onto its corners. The grid is every centimetre (or inch) and
+   numbered every 10 cm (12 in); the dashed diagonals are straight on a flat
+   table.
+2. If the inner lines do not land on the mat's lines, add **Columns** and
+   **Rows** until a point falls where the trouble is (the spacing is shown:
+   "every 15 cm"), then drag that point onto the mat crossing it is labelled
+   with. Arrow keys nudge the selected point a pixel at a time; `[` and `]`
+   pick the next one. **Corners only** forgets the inner points.
+3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
+   `,` and `.` for 1°), flip it (`F` across, `V` down), invert for white lines
+   on black (`I`), thicken the lines, pick the size layer, hide the tools
+   (`H`) and cut. **Grid** projects the calibration grid over the fabric to
+   check the grain or the calibration; **Outline** shows the page edge.
+
+Each table keeps its own calibration (**New table** for Desk, Floor, …), and
+each remembers the window it was made in, so calibrate in full screen and
+project in full screen. If the window is a different size, the page says so.
+
+With no gridded mat, as on a floor: tape out a rectangle, measure it, put its
+size in the boxes, drag the corners onto it, and lay a tape measure along a
+grid line. Every point is labelled with its distance from the top-left
+corner, so you can drag it onto the right spot on the tape.
+
+## What it reads
+
+- **PDF**: any page of a multi-page file, with the layers (pattern sizes are
+  usually layers) switchable. Page size comes from the PDF, so a copyshop A0
+  file is A0 on the table. Pages are not stitched together: open the A0 file,
+  or a single page at a time.
+- **SVG**: a Grain-Nest export or one of the [calibration cards](../calibration/),
+  sized from its `width`/`height` in mm, cm or inches, with Inkscape layers
+  switchable.
+
+## How it works
+
+`src/calc/homography.ts` is the four-corner map. `src/calc/mesh.ts` is the
+mesh: the corners' homography plus a nudge per inner point, blended bilinearly
+inside each cell, so adding points changes nothing until one is moved;
+`screenToTable` inverts it with Newton's method so dragging the pattern works
+in table centimetres on a bent table too. `src/calc/placement.ts` is where
+the page sits (centre, turn, flip, scale). `src/render.ts` draws the page
+through the mesh with WebGL 2, with the line weight and inversion in the
+shader; `src/document.ts` opens PDFs with pdf.js (bundled, worker included)
+and SVGs through an image. `src/main.ts` is the page.
+
+```sh
+npm install
+npm run dev        # http://localhost:5173
+npm test           # the maths
+npm run typecheck
+npm run build      # dist/index.html, one self-contained file, plus manifest, icons, sw.js
+npm run smoke      # clicks through the built page in headless Chromium
+```
+
+Lantern needs WebGL 2, which every current browser has; Chrome or Safari on
+the Mac that drives the projector is the expected home. It is installable
+like Thimble and works offline.
+
+## Thanks
+
+[Pattern Projector](https://github.com/Pattern-Projector/pattern-projector)
+by Courtney Pattison (MIT) showed what projector cutting in a browser should
+feel like; its four-corner calibration is the starting point here. Nothing
+from it is copied, so Lantern is not a fork: it is a smaller page in the
+same spirit with one idea added.

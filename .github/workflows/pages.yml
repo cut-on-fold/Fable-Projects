@@ -3,7 +3,7 @@ name: Publish to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['thimble/**', 'bolt-end/**', 'site/**', '.github/workflows/pages.yml']
+    paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -29,12 +29,16 @@ jobs:
       - name: Bolt End
         working-directory: bolt-end
         run: npm ci && npm test && npm run typecheck && npm run build
+      - name: Lantern
+        working-directory: lantern
+        run: npm ci && npm test && npm run typecheck && npm run build
       - name: Assemble the site
         run: |
-          mkdir -p site-out/thimble site-out/bolt-end
+          mkdir -p site-out/thimble site-out/bolt-end site-out/lantern
           cp -r site/. site-out/
           cp -r thimble/dist/. site-out/thimble/
           cp -r bolt-end/dist/. site-out/bolt-end/
+          cp -r lantern/dist/. site-out/lantern/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site-out
