@@ -1,6 +1,8 @@
 import './styles.css';
 import { defaultColumns, parseCsv, statuses, toRecords, type Record } from './csv';
 import { PAGE_SIZES, TEMPLATES, perPage, position, type Template } from './templates';
+import { HEAD_MM, THERMAL_LABELS, drawLabel, type ThermalLabel } from './thermal';
+import { bluetoothAvailable, printToNiimbot } from './niimbot';
 
 const STORAGE_KEY = 'bolt-end.v1';
 
@@ -13,9 +15,15 @@ interface Settings {
   skip: number;
   statuses: string[];
   search: string;
+  /** Thermal printing: darkness 1–5 and copies of each label. */
+  density: number;
+  copies: number;
+  /** A Niimbot label size of your own, mm. */
+  customW: number;
+  customL: number;
 }
 
-const defaults: Settings = { template: 'L7160', columns: [], titleColumn: 'Name', showKeys: true, fontPt: 8, skip: 0, statuses: [], search: '' };
+const defaults: Settings = { template: 'L7160', columns: [], titleColumn: 'Name', showKeys: true, fontPt: 8, skip: 0, statuses: [], search: '', density: 3, copies: 1, customW: 50, customL: 30 };
 
 function loadSettings(): Settings {
   try {
@@ -48,6 +56,7 @@ let header: string[] = [];
 let records: Record[] = [];
 let fileName = 'Example rows (not your stash)';
 let isSample = true;
+let printing = false;
 
 function loadText(text: string, name: string, sample = false): void {
   const table = parseCsv(text);
@@ -79,8 +88,18 @@ const LOGO = `<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="8" widt
 const root = document.getElementById('app')!;
 const pageStyle = document.getElementById('pagesize') as HTMLStyleElement;
 
-function template(): Template {
+/** The chosen sheet layout, or null when a thermal label is chosen. */
+function template(): Template | null {
+  if (THERMAL_LABELS.some((l) => l.id === settings.template)) return null;
   return TEMPLATES.find((t) => t.id === settings.template) ?? TEMPLATES[0]!;
+}
+
+/** The chosen thermal label, with the custom size filled in. */
+function thermal(): ThermalLabel | null {
+  const l = THERMAL_LABELS.find((x) => x.id === settings.template);
+  if (!l) return null;
+  if (l.custom) return { ...l, width: Math.min(HEAD_MM + 2, Math.max(10, settings.customW)), length: Math.min(200, Math.max(8, settings.customL)) };
+  return l;
 }
 
 function selected(): Record[] {
@@ -92,18 +111,37 @@ function selected(): Record[] {
   });
 }
 
+/** The lines under the title for one row, as they print. */
+function linesFor(r: Record): string[] {
+  const out: string[] = [];
+  for (const c of settings.columns) {
+    const v = (r[c] ?? '').replace(/\s+/g, ' ').trim();
+    if (!v) continue;
+    out.push(settings.showKeys ? `${c}: ${v}` : v);
+  }
+  return out;
+}
+
 function render(): void {
   root.replaceChildren();
   const t = template();
-  const page = PAGE_SIZES[t.page];
-  pageStyle.textContent = `@page { size: ${t.page} portrait; margin: 0; }`;
+  const th = thermal();
+  pageStyle.textContent = t ? `@page { size: ${t.page} portrait; margin: 0; }` : '';
 
-  const printBtn = el('button', { type: 'button', class: 'print', id: 'print' }, 'Print…');
-  printBtn.addEventListener('click', () => window.print());
   const brand = el('div', { class: 'brand' });
   brand.innerHTML = LOGO;
   brand.append(el('div', {}, el('h1', {}, 'Bolt End'), el('p', {}, 'Shelf labels and swatch cards from a Stash export')));
-  root.append(el('header', { class: 'header' }, brand, printBtn));
+  const headerEl = el('header', { class: 'header' }, brand);
+  if (t) {
+    const printBtn = el('button', { type: 'button', class: 'print', id: 'print' }, 'Print…');
+    printBtn.addEventListener('click', () => window.print());
+    headerEl.append(printBtn);
+  } else if (bluetoothAvailable()) {
+    const printBtn = el('button', { type: 'button', class: 'print', id: 'print' }, 'Print on the Niimbot…');
+    printBtn.addEventListener('click', () => void printThermal());
+    headerEl.append(printBtn);
+  }
+  root.append(headerEl);
 
   // ---- settings panel
   const panel = el('section', { class: 'panel', 'aria-label': 'Settings' });
@@ -121,10 +159,34 @@ function render(): void {
     el('span', { class: 'hint' }, 'In Stash: Backups & export → Export everything, then pick Fabric.csv (or Patterns.csv, Notions.csv: any category works). The file stays in this browser.')));
 
   const tSel = el('select', { id: 'template' });
-  for (const x of TEMPLATES) tSel.append(el('option', { value: x.id }, x.name));
-  tSel.value = t.id;
-  tSel.addEventListener('change', () => { settings.template = tSel.value; settings.fontPt = template().fontPt; settings.skip = 0; saveSettings(); render(); });
-  panel.append(el('div', { class: 'field' }, el('label', { for: 'template' }, 'Labels'), tSel, el('span', { class: 'hint' }, `${perPage(t)} a sheet on ${t.page}. Print a sheet on plain paper first and hold it against the labels.`)));
+  const sheetsGroup = el('optgroup', { label: 'Label sheets and card, for an ordinary printer' });
+  for (const x of TEMPLATES) sheetsGroup.append(el('option', { value: x.id }, x.name));
+  const thermalGroup = el('optgroup', { label: 'Niimbot B21 thermal labels' });
+  for (const x of THERMAL_LABELS) thermalGroup.append(el('option', { value: x.id }, x.name));
+  tSel.append(sheetsGroup, thermalGroup);
+  tSel.value = settings.template;
+  tSel.addEventListener('change', () => {
+    settings.template = tSel.value;
+    settings.fontPt = (template() ?? thermal())!.fontPt;
+    settings.skip = 0;
+    saveSettings();
+    render();
+  });
+  const layoutHint = t
+    ? `${perPage(t)} a sheet on ${t.page}. Print a sheet on plain paper first and hold it against the labels.`
+    : `${th!.width} × ${th!.length} mm labels, printed one at a time. The B21 prints 48 mm across, so a 50 mm label keeps 1 mm plain at each edge.`;
+  panel.append(el('div', { class: 'field' }, el('label', { for: 'template' }, 'Labels'), tSel, el('span', { class: 'hint' }, layoutHint)));
+
+  if (th?.custom) {
+    const w = el('input', { type: 'number', id: 'custom-w', min: '10', max: String(HEAD_MM + 2), step: '1' });
+    w.value = String(settings.customW);
+    w.addEventListener('change', () => { settings.customW = parseFloat(w.value) || 50; saveSettings(); render(); });
+    const l = el('input', { type: 'number', id: 'custom-l', min: '8', max: '200', step: '1' });
+    l.value = String(settings.customL);
+    l.addEventListener('change', () => { settings.customL = parseFloat(l.value) || 30; saveSettings(); render(); });
+    panel.append(el('div', { class: 'field' }, el('label', { for: 'custom-w' }, 'Label width (mm, across the printer)'), w));
+    panel.append(el('div', { class: 'field' }, el('label', { for: 'custom-l' }, 'Label length (mm)'), l));
+  }
 
   const titleSel = el('select', { id: 'title' });
   for (const h of header) titleSel.append(el('option', { value: h }, h));
@@ -132,19 +194,31 @@ function render(): void {
   titleSel.addEventListener('change', () => { settings.titleColumn = titleSel.value; saveSettings(); render(); });
   panel.append(el('div', { class: 'field' }, el('label', { for: 'title' }, 'Title line'), titleSel));
 
-  const font = el('input', { type: 'number', id: 'font', min: '5', max: '16', step: '0.5' });
+  const font = el('input', { type: 'number', id: 'font', min: '5', max: '20', step: '0.5' });
   font.value = String(settings.fontPt);
-  font.addEventListener('change', () => { settings.fontPt = Math.min(16, Math.max(5, parseFloat(font.value) || 8)); saveSettings(); render(); });
+  font.addEventListener('change', () => { settings.fontPt = Math.min(20, Math.max(5, parseFloat(font.value) || 8)); saveSettings(); render(); });
   panel.append(el('div', { class: 'field' }, el('label', { for: 'font' }, 'Text size (pt)'), font));
 
-  const skip = el('input', { type: 'number', id: 'skip', min: '0', max: String(perPage(t) - 1), step: '1' });
-  skip.value = String(settings.skip);
-  skip.addEventListener('change', () => { settings.skip = Math.min(perPage(t) - 1, Math.max(0, parseInt(font.value ? skip.value : '0', 10) || 0)); saveSettings(); render(); });
-  panel.append(el('div', { class: 'field' }, el('label', { for: 'skip' }, 'Start at label'), skip, el('span', { class: 'hint' }, 'Labels already used on the first sheet, counted across then down.')));
+  if (t) {
+    const skip = el('input', { type: 'number', id: 'skip', min: '0', max: String(perPage(t) - 1), step: '1' });
+    skip.value = String(settings.skip);
+    skip.addEventListener('change', () => { settings.skip = Math.min(perPage(t) - 1, Math.max(0, parseInt(skip.value, 10) || 0)); saveSettings(); render(); });
+    panel.append(el('div', { class: 'field' }, el('label', { for: 'skip' }, 'Start at label'), skip, el('span', { class: 'hint' }, 'Labels already used on the first sheet, counted across then down.')));
+  } else {
+    const density = el('select', { id: 'density' });
+    for (let d = 1; d <= 5; d++) density.append(el('option', { value: String(d) }, d === 1 ? '1 · lightest' : d === 3 ? '3 · usual' : d === 5 ? '5 · darkest' : String(d)));
+    density.value = String(settings.density);
+    density.addEventListener('change', () => { settings.density = parseInt(density.value, 10); saveSettings(); });
+    panel.append(el('div', { class: 'field' }, el('label', { for: 'density' }, 'Darkness'), density));
+    const copies = el('input', { type: 'number', id: 'copies', min: '1', max: '20', step: '1' });
+    copies.value = String(settings.copies);
+    copies.addEventListener('change', () => { settings.copies = Math.min(20, Math.max(1, parseInt(copies.value, 10) || 1)); saveSettings(); });
+    panel.append(el('div', { class: 'field' }, el('label', { for: 'copies' }, 'Copies of each'), copies));
+  }
 
   const search = el('input', { type: 'text', id: 'search', placeholder: 'linen, Shelf B, Lamazi…' });
   search.value = settings.search;
-  search.addEventListener('input', () => { settings.search = search.value; saveSettings(); renderSheets(); });
+  search.addEventListener('input', () => { settings.search = search.value; saveSettings(); renderOutput(); });
   panel.append(el('div', { class: 'field' }, el('label', { for: 'search' }, 'Only rows containing'), search));
 
   const sts = statuses(records);
@@ -157,7 +231,7 @@ function render(): void {
         const on = sts.filter((x) => (document.getElementById(`st-${x}`) as HTMLInputElement).checked);
         settings.statuses = on.length === sts.length ? [] : on;
         saveSettings();
-        renderSheets();
+        renderOutput();
       });
       checks.append(el('label', {}, cb, s));
     }
@@ -172,31 +246,45 @@ function render(): void {
     cb.addEventListener('change', () => {
       settings.columns = header.filter((x) => x !== settings.titleColumn && (document.getElementById(`col-${x}`) as HTMLInputElement | null)?.checked);
       saveSettings();
-      renderSheets();
+      renderOutput();
     });
     cols.append(el('label', {}, cb, h));
   }
   const keys = el('input', { type: 'checkbox', id: 'keys' });
   keys.checked = settings.showKeys;
-  keys.addEventListener('change', () => { settings.showKeys = keys.checked; saveSettings(); renderSheets(); });
+  keys.addEventListener('change', () => { settings.showKeys = keys.checked; saveSettings(); renderOutput(); });
   panel.append(el('div', { class: 'field wide' }, el('span', { class: 'lbl' }, 'Lines on each label'), cols, el('label', { class: 'checks' }, keys, 'Show the field names')));
 
   const drop = el('div', { class: 'drop' }, 'Or drop a CSV anywhere on this page');
   panel.append(drop);
   root.append(panel);
 
-  const sheets = el('div', { class: 'sheets', id: 'sheets' });
-  root.append(sheets);
-  root.append(el('footer', { class: 'footer' }, el('p', {}, `Sheet: ${t.page} ${page.width.toFixed(0)} × ${page.height.toFixed(0)} mm. Print at 100% with no scaling and margins set to none; the browser's print dialog has a "Scale" setting that must say 100.`)));
-  renderSheets();
+  root.append(el('div', { class: 'sheets', id: 'sheets' }));
+  const footer = el('footer', { class: 'footer' });
+  if (t) {
+    const page = PAGE_SIZES[t.page];
+    footer.append(el('p', {}, `Sheet: ${t.page} ${page.width.toFixed(0)} × ${page.height.toFixed(0)} mm. Print at 100% with no scaling and margins set to none; the browser's print dialog has a "Scale" setting that must say 100.`));
+  } else {
+    footer.append(el('p', {}, bluetoothAvailable()
+      ? 'Printing goes over Bluetooth from this browser: switch the printer on, press Print, and pick it from the list. If the browser cannot see it, close the Niimbot app first; it keeps the printer to itself.'
+      : 'This browser cannot talk to the printer (Web Bluetooth is in Chrome and Edge on a Mac, Windows or Android, not in Safari or Firefox). Download the images instead and print them from the Niimbot app: New label → picture.'));
+  }
+  root.append(footer);
+  renderOutput();
   fitZoom();
 }
 
-function renderSheets(): void {
+function renderOutput(): void {
+  const t = template();
+  if (t) renderSheets(t);
+  else renderThermal(thermal()!);
+}
+
+function renderSheets(t: Template): void {
   const sheets = document.getElementById('sheets');
   if (!sheets) return;
   sheets.replaceChildren();
-  const t = template();
+  sheets.className = 'sheets';
   const page = PAGE_SIZES[t.page];
   const rows = selected();
   const n = perPage(t);
@@ -240,10 +328,106 @@ function labelFor(r: Record, t: Template, k: number): HTMLElement {
   return label;
 }
 
-function fitZoom(): void {
+// ---------- thermal labels
+
+let thermalCanvases: Array<{ canvas: HTMLCanvasElement; name: string }> = [];
+
+/** Draw every selected row at printer resolution; also what the preview shows. */
+function drawThermal(th: ThermalLabel): { dropped: number } {
+  thermalCanvases = [];
+  let dropped = 0;
+  for (const r of selected()) {
+    const title = r[settings.titleColumn] || '(no name)';
+    const d = drawLabel(title, linesFor(r), th, settings.fontPt);
+    dropped += d.dropped;
+    thermalCanvases.push({ canvas: d.canvas, name: title });
+  }
+  return { dropped };
+}
+
+function renderThermal(th: ThermalLabel): void {
   const sheets = document.getElementById('sheets');
   if (!sheets) return;
-  const page = PAGE_SIZES[template().page];
+  sheets.replaceChildren();
+  sheets.className = 'thermal';
+  const { dropped } = drawThermal(th);
+  const rows = thermalCanvases.length;
+
+  const bar = el('div', { class: 'thermal-bar' });
+  const status = el('span', { class: 'status', id: 'print-status', role: 'status' }, dropped ? `${dropped} line${dropped === 1 ? '' : 's'} did not fit: a smaller text size or fewer lines.` : '');
+  const dl = el('button', { type: 'button', class: 'btn', id: 'download-all' }, `Download ${rows} PNG${rows === 1 ? '' : 's'}`);
+  dl.addEventListener('click', () => void downloadAll());
+  bar.append(dl, status);
+  sheets.append(bar);
+
+  const grid = el('div', { class: 'thermal-grid' });
+  const cssWidth = th.width * 4;
+  for (const { canvas, name } of thermalCanvases) {
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${(th.length * 4 * canvas.height) / (th.length * 8)}px`;
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', name);
+    const save = el('button', { type: 'button', class: 'link' }, 'Save PNG');
+    save.addEventListener('click', () => void download(canvas, name));
+    grid.append(el('figure', { class: 'thermal-label' }, canvas, el('figcaption', {}, save)));
+  }
+  if (!rows) grid.append(el('p', { class: 'empty' }, 'No rows match.'));
+  sheets.append(grid);
+
+  const name = document.getElementById('file-name');
+  if (name) name.textContent = `${fileName} · ${rows} of ${records.length} rows · ${rows} label${rows === 1 ? '' : 's'}`;
+}
+
+function safeName(s: string): string {
+  return s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 60) || 'label';
+}
+
+function download(canvas: HTMLCanvasElement, name: string): Promise<void> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return resolve();
+      const url = URL.createObjectURL(blob);
+      const a = el('a', { href: url, download: `${safeName(name)}.png` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { URL.revokeObjectURL(url); resolve(); }, 300);
+    }, 'image/png');
+  });
+}
+
+async function downloadAll(): Promise<void> {
+  const status = document.getElementById('print-status');
+  let n = 0;
+  for (const { canvas, name } of thermalCanvases) {
+    await download(canvas, name);
+    n++;
+    if (status) status.textContent = `Saved ${n} of ${thermalCanvases.length}. The browser may ask once whether to allow several downloads.`;
+  }
+}
+
+async function printThermal(): Promise<void> {
+  if (printing) return;
+  const status = document.getElementById('print-status');
+  const say = (m: string) => { if (status) status.textContent = m; };
+  const btn = document.getElementById('print') as HTMLButtonElement | null;
+  printing = true;
+  if (btn) btn.disabled = true;
+  try {
+    await printToNiimbot({ canvases: thermalCanvases.map((c) => c.canvas), density: settings.density, copies: settings.copies, onProgress: say });
+  } catch (e) {
+    say(e instanceof Error ? e.message : String(e));
+  } finally {
+    printing = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+function fitZoom(): void {
+  const sheets = document.getElementById('sheets');
+  const t = template();
+  if (!sheets || !t) return;
+  const page = PAGE_SIZES[t.page];
   const px = (page.width * 96) / 25.4;
   const zoom = Math.min(1, sheets.clientWidth / px);
   document.documentElement.style.setProperty('--zoom', zoom.toFixed(3));
@@ -258,5 +442,8 @@ window.addEventListener('drop', (e) => {
   const f = e.dataTransfer?.files?.[0];
   if (f) f.text().then((text) => loadText(text, f.name));
 });
+
+// Redraw thermal labels once the label font has loaded, so the preview and the print match.
+document.fonts?.ready.then(() => { if (thermal()) renderOutput(); });
 
 loadText(SAMPLE_CSV, 'Example rows (not your stash)', true);

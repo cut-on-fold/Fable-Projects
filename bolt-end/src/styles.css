@@ -109,3 +109,19 @@ h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
   .sheet .guide { display: none; }
 }
+
+/* ---------- thermal labels */
+.thermal { display: flex; flex-direction: column; gap: 14px; }
+.thermal-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.thermal-bar .btn { border: 1px solid var(--line-strong); background: var(--panel); border-radius: 999px; padding: 8px 16px; font-weight: 700; color: var(--accent); cursor: pointer; }
+.thermal-bar .btn:hover { background: var(--accent-soft); }
+.thermal-bar .status { color: var(--muted); font-size: 14px; }
+.thermal-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+.thermal-label { margin: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; max-width: 100%; }
+.thermal-label canvas { max-width: 100%; height: auto; background: #ffffff; box-shadow: var(--shadow); border-radius: 2px; image-rendering: auto; }
+.thermal-label figcaption button { font-size: 13px; }
+button.link { border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 2px 4px; }
+button.link:hover { text-decoration: underline; }
+.thermal .empty { color: var(--muted); }
+.print:disabled { opacity: 0.6; cursor: wait; }
+@media print { .thermal { display: none; } }

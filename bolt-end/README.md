@@ -36,6 +36,30 @@ are left out.
 Another sheet is a line in `src/templates.ts`: page, rows and columns, label
 size, margins and gaps in millimetres.
 
+## Niimbot B21
+
+The same rows print on a Niimbot B21 thermal label printer. Pick a Niimbot
+size in the Labels list (50 × 30 mm and the other common rolls, or your own
+size) and each row becomes one label, drawn in black and white at the
+printer's 203 dots per inch: the preview is exactly what prints.
+
+- **Print on the Niimbot…** sends the labels straight to the printer over
+  Bluetooth. This works in Chrome and Edge on a Mac, Windows or Android; Safari
+  and Firefox have no Web Bluetooth. Switch the printer on, press the button,
+  pick the printer from the browser's list. Close the Niimbot app first: while
+  it is open it keeps the printer to itself. Darkness and copies are in the
+  settings.
+- **Download PNGs** saves one image per label, which the Niimbot app prints
+  as a picture (New label → picture) at the label's size. This is the way on an
+  iPhone or iPad.
+
+The B21 prints 48 mm across its head, so a 50 mm label keeps 1 mm plain at
+each edge. If a line does not fit, the status line says how many were left
+off: use a smaller text size or fewer lines. Bluetooth printing uses
+[NiimBlueLib](https://github.com/MultiMote/niimbluelib) (MIT), the open
+implementation of the Niimbot protocol; it was written without a printer to
+hand, so the first print is a test print.
+
 ## Develop
 
 ```sh
@@ -48,6 +72,8 @@ npm run build       # dist/index.html, one self-contained file
 ```
 
 `src/csv.ts` reads the export (BOM, CRLF, quoted cells); `src/templates.ts`
-is the sheet geometry; `src/main.ts` draws the settings and the sheets. The
-sheets are laid out in millimetres and printed through the browser at exactly
-that size, with the settings panel hidden.
+is the sheet geometry; `src/thermal.ts` the Niimbot sizes, text layout and
+canvas drawing; `src/niimbot.ts` the Bluetooth printing; `src/main.ts` draws
+the settings and the sheets. The sheets are laid out in millimetres and
+printed through the browser at exactly that size, with the settings panel
+hidden.

@@ -52,6 +52,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Bolt End v0.2.0** — Niimbot B21 labels: ten roll sizes and a custom
+      size, each row drawn at 203 dpi, printed over Web Bluetooth from Chrome or
+      Edge (darkness, copies) or saved as PNGs for the Niimbot app.
 - [x] **Thimble v0.5.1** — fixes from a code review: inverted pleat marks now
       meet on one placement line; knife pleats keep their last placement line;
       the yardage piece list follows the unit toggle; a fat quarter is a quarter

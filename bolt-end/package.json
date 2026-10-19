@@ -1,6 +1,6 @@
 {
   "name": "bolt-end",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Printable shelf labels and swatch cards from a Stash export, on Avery label sheets or plain card",
   "private": true,
   "license": "MIT",
@@ -19,5 +19,10 @@
     "vite-plugin-singlefile": "2.3.3",
     "vitest": "5.0.5"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@mmote/niimbluelib": "0.47.1"
+  }
 }
