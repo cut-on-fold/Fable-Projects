@@ -46,6 +46,18 @@ Each table keeps its own calibration (**New table** for Desk, Floor, …), and
 each remembers the window it was made in, so calibrate in full screen and
 project in full screen. If the window is a different size, the page says so.
 
+**From a chair.** With a webcam over the table (an iPhone on a mount is a
+Mac webcam through Continuity Camera), press **Camera** in Calibrate. A small
+window shows the picture; press **Find corners** and click the four corner
+crosses in it once, and from then on the window zooms in on whichever point
+is selected. So: `[` and `]` to the next point, arrow keys until the
+projected cross sits on the mat line in the picture, next point. The window
+can be dragged and resized, the picture turned, mirrored and zoomed 1× to
+8×, and a click in it looks somewhere else until the selection changes. The
+camera needs the page served over https (the Pages site) or from localhost,
+not opened as a saved file. The camera is never measured: it only decides
+where to zoom, and your eye does the aligning.
+
 With no gridded mat, as on a floor: tape out a rectangle, measure it, put its
 size in the boxes, drag the corners onto it, and lay a tape measure along a
 grid line. Every point is labelled with its distance from the top-left
@@ -73,7 +85,8 @@ in table centimetres on a bent table too. `src/calc/placement.ts` is where
 the page sits (centre, turn, flip, scale). `src/render.ts` draws the page
 through the mesh with WebGL 2, with the line weight and inversion in the
 shader; `src/document.ts` opens PDFs with pdf.js (bundled, worker included)
-and SVGs through an image. `src/main.ts` is the page.
+and SVGs through an image. `src/camera.ts` is the camera window. `src/main.ts`
+is the page.
 
 ```sh
 npm install
