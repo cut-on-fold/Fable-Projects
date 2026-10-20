@@ -1,10 +1,12 @@
 name: Tests
 
+# Runs once per commit: on pull requests for branches, on push for main.
 on:
   push:
+    branches: [main]
     paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**', '.github/workflows/tests.yml']
   pull_request:
-    paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**']
+    paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**', '.github/workflows/tests.yml']
 
 jobs:
   web:
@@ -29,12 +31,15 @@ jobs:
       - name: Browser smoke test
         if: matrix.project == 'thimble' || matrix.project == 'lantern'
         run: npx playwright install --with-deps chromium && npm run smoke
+      # The screenshots are only worth keeping when something went wrong, and not for long:
+      # artifacts count against the account's Actions storage.
       - uses: actions/upload-artifact@v5
-        if: (matrix.project == 'thimble' || matrix.project == 'lantern') && always()
+        if: (matrix.project == 'thimble' || matrix.project == 'lantern') && failure()
         with:
           name: ${{ matrix.project }}-smoke-shots
           path: ${{ matrix.project }}/smoke-shots
           if-no-files-found: ignore
+          retention-days: 5
 
   calibration:
     runs-on: ubuntu-latest
