@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.4** — the arms of each calibration cross run along the
+      grid lines through the point, turned with the table, instead of level
+      with the screen.
 - [x] **Lantern v0.3.3** — calibration rings that survive the projector: an
       opaque centre blots out the grid lines crossing each point, the rings
       are pink (purple on white), a colour the grid never uses, and thicker.

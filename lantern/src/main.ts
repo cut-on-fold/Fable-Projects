@@ -768,10 +768,21 @@ function draw(): void {
         ctx.lineWidth = isSel ? 4 : 2.5;
         ctx.strokeStyle = isSel ? chalk : ring;
         ctx.stroke();
+        // The arms run along the grid's own lines through this point, which on the screen are turned and
+        // bent with the table, rather than level with the screen.
+        const t = tablePointAt(m, i, j);
+        const dirs: Pt[] = [];
+        for (const step of [{ x: 0.5, y: 0 }, { x: 0, y: 0.5 }]) {
+          const q = tableToScreen(m, { x: t.x + step.x, y: t.y + step.y });
+          const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+          dirs.push({ x: (q.x - p.x) / len, y: (q.y - p.y) / len });
+        }
         ctx.beginPath();
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          ctx.moveTo(p.x + dx * (r + 3), p.y + dy * (r + 3));
-          ctx.lineTo(p.x + dx * arm, p.y + dy * arm);
+        for (const d of dirs) {
+          for (const sign of [1, -1]) {
+            ctx.moveTo(p.x + sign * d.x * (r + 3), p.y + sign * d.y * (r + 3));
+            ctx.lineTo(p.x + sign * d.x * arm, p.y + sign * d.y * arm);
+          }
         }
         ctx.lineWidth = isSel ? 4 : 2.5;
         ctx.stroke();
