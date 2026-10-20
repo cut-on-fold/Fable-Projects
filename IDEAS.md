@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.3** — calibration rings that survive the projector: an
+      opaque centre blots out the grid lines crossing each point, the rings
+      are pink (purple on white), a colour the grid never uses, and thicker.
 - [x] **Lantern v0.3.2** — calibration handles redrawn for a mat with painted
       dots: every ring has a clear, lit centre with nothing drawn over it, and
       the selected point is a big chalk-coloured ring with long arms pointing

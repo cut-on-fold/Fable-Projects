@@ -684,6 +684,7 @@ function draw(): void {
   const ink = state.invert ? '#e8eaec' : '#22272b';
   const accent = state.invert ? '#8fc3dd' : '#2f6f8f';
   const chalk = state.invert ? '#ffd166' : '#b8471f';
+  const ring = state.invert ? '#ff7eb6' : '#7a3b8f';
 
   const polyline = (pts: Pt[]) => {
     ctx.beginPath();
@@ -755,21 +756,24 @@ function draw(): void {
         // Every handle is a ring with a clear, lit centre, so a dot painted on the mat crossing shows in the
         // middle of it. The selected one is bigger, in the chalk colour, with long arms pointing in at the dot;
         // the others are small with short stubs. Nothing is drawn over the centre.
-        const r = isSel ? 16 : 10;
-        const arm = isSel ? 48 : 18;
+        const r = isSel ? 16 : 11;
+        const arm = isSel ? 48 : 20;
+        // An opaque centre blots out the grid lines that cross here, so the ring stands on its own and a dot
+        // on the mat is seen on plain grey (or white), not under two bright lines. The ring is a colour the
+        // grid never uses: pink on the inverted picture, chalk yellow for the selected point.
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-        ctx.fillStyle = state.invert ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = state.invert ? '#5c5c5c' : '#ffffff';
         ctx.fill();
-        ctx.lineWidth = isSel ? 3 : 1.5;
-        ctx.strokeStyle = isSel ? chalk : accent;
+        ctx.lineWidth = isSel ? 4 : 2.5;
+        ctx.strokeStyle = isSel ? chalk : ring;
         ctx.stroke();
         ctx.beginPath();
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          ctx.moveTo(p.x + dx * (r + 2), p.y + dy * (r + 2));
+          ctx.moveTo(p.x + dx * (r + 3), p.y + dy * (r + 3));
           ctx.lineTo(p.x + dx * arm, p.y + dy * arm);
         }
-        ctx.lineWidth = isSel ? 3 : 1.5;
+        ctx.lineWidth = isSel ? 4 : 2.5;
         ctx.stroke();
         const label = coords(tablePointAt(m, i, j));
         const right = i < cols(m) / 2;
