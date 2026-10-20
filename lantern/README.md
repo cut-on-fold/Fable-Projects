@@ -28,7 +28,10 @@ is labelled with, so the picture bends to follow the surface.
    each on a line of the mat; the last cell is just shorter. Circles appear
    at the crossings, labelled with their distance from the corner; drag each
    one onto that crossing on the mat. Arrow keys nudge the selected point a
-   pixel at a time; `[` and `]` pick the next one. **Corners only** forgets
+   pixel at a time; `Tab` picks the next one along the row and `Shift+Tab` the
+   next one down the column (`[` and `]` go back and forth). The arms of each
+   cross stop short of the centre, so a dot painted on the mat crossing sits in
+   a clear hole with the arms pointing at it. **Corners only** forgets
    the inner points.
 3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
    `,` and `.` for 1°), flip it (`F` across, `V` down), invert for white lines
@@ -50,7 +53,7 @@ project in full screen. If the window is a different size, the page says so.
 Mac webcam through Continuity Camera), press **Camera** in Calibrate. A small
 window shows the picture; press **Find corners** and click the four corner
 crosses in it once, and from then on the window zooms in on whichever point
-is selected. So: `[` and `]` to the next point, arrow keys until the
+is selected. So: `Tab` to the next point, arrow keys until the
 projected cross sits on the mat line in the picture, next point. The window
 can be dragged and resized, the picture turned, mirrored and zoomed 1× to
 8×, and a click in it looks somewhere else until the selection changes. The

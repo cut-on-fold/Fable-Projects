@@ -372,8 +372,8 @@ function refreshHint(): void {
   } else if (state.mode === 'calibrate') {
     hint.textContent =
       isCornersOnly(m)
-        ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points, or type how far apart you want them (6 in lands on a mat’s inch lines). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; [ and ] pick the next one; H hides these tools if a corner is under them.'
-        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); [ and ] pick the next one. Points every sets how far apart they are.'
+        ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points, or type how far apart you want them (6 in lands on a mat’s inch lines). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; Tab picks the next one along the row, Shift+Tab the next one down; H hides these tools if a corner is under them.'
+        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); Tab picks the next one along the row, Shift+Tab the next one down. Points every sets how far apart they are.'
   } else {
     hint.textContent = doc
       ? 'Drag to move the pattern. Arrow keys move it 1 cm (Shift 10 cm, Alt 1 mm). The picture bends with the calibration, so a dip in the table is already allowed for.'
@@ -439,7 +439,7 @@ function renderPop(): void {
         {},
         el('li', {}, el('kbd', { text: 'C' }), ' calibrate, ', el('kbd', { text: 'P' }), ' project, ', el('kbd', { text: 'H' }), ' hide or show the tools, ', el('kbd', { text: 'Esc' }), ' show them'),
         el('li', {}, el('kbd', { text: '← ↑ → ↓' }), ' nudge the selected point (calibrating) or the pattern (projecting); ', el('kbd', { text: 'Shift' }), ' bigger steps, ', el('kbd', { text: 'Alt' }), ' smaller'),
-        el('li', {}, el('kbd', { text: '[' }), ' ', el('kbd', { text: ']' }), ' select the previous or next calibration point'),
+        el('li', {}, el('kbd', { text: 'Tab' }), ' select the next calibration point along the row, ', el('kbd', { text: 'Shift' }), '+', el('kbd', { text: 'Tab' }), ' the next one down the column; ', el('kbd', { text: '[' }), ' ', el('kbd', { text: ']' }), ' the previous or next'),
         el('li', {}, el('kbd', { text: 'R' }), ' turn 90°, ', el('kbd', { text: ',' }), ' ', el('kbd', { text: '.' }), ' turn 1° either way, ', el('kbd', { text: 'F' }), ' flip left–right, ', el('kbd', { text: 'V' }), ' flip top–bottom, ', el('kbd', { text: '0' }), ' recentre'),
         el('li', {}, el('kbd', { text: 'I' }), ' invert, ', el('kbd', { text: 'G' }), ' grid, ', el('kbd', { text: 'O' }), ' outline, ', el('kbd', { text: '+' }), ' ', el('kbd', { text: '−' }), ' line weight'),
       ),
@@ -754,18 +754,21 @@ function draw(): void {
         const isSel = !!selected && selected.i === i && selected.j === j;
         ctx.beginPath();
         ctx.arc(p.x, p.y, isSel ? 13 : 11, 0, Math.PI * 2);
-        ctx.fillStyle = isSel ? chalk : state.invert ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
+        // Inverted, the inside of the ring is lit a little so a dot on the mat shows inside it.
+        ctx.fillStyle = isSel ? chalk : state.invert ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.85)';
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = isSel ? chalk : accent;
         ctx.stroke();
         // the selected point gets long arms, so it is easy to find in a camera picture
+        // The arms stop short of the centre, so a mark on the mat sits in a clear hole with the arms pointing at it.
         const arm = isSel ? 40 : 14;
+        const gap = isSel ? 8 : 5;
         ctx.beginPath();
-        ctx.moveTo(p.x - arm, p.y);
-        ctx.lineTo(p.x + arm, p.y);
-        ctx.moveTo(p.x, p.y - arm);
-        ctx.lineTo(p.x, p.y + arm);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          ctx.moveTo(p.x + dx * gap, p.y + dy * gap);
+          ctx.lineTo(p.x + dx * arm, p.y + dy * arm);
+        }
         ctx.lineWidth = isSel ? 2 : 1;
         ctx.stroke();
         const label = coords(tablePointAt(m, i, j));
@@ -938,6 +941,31 @@ window.addEventListener('keydown', (e) => {
       const cur = selected ? selected.j * m.xs.length + selected.i : -1;
       const next = (cur + (key === ']' ? 1 : n - 1) + n) % n;
       selected = { i: next % m.xs.length, j: Math.floor(next / m.xs.length) };
+      redraw();
+      break;
+    }
+    case 'tab': {
+      // Tab walks along the row, Shift+Tab down the column, each wrapping to the next line.
+      if (state.mode !== 'calibrate') return;
+      if (t && t !== document.body) (t as HTMLElement).blur();
+      const m = mesh();
+      const nx = m.xs.length;
+      const ny = m.ys.length;
+      let { i, j } = selected ?? { i: -1, j: 0 };
+      if (e.shiftKey) {
+        j++;
+        if (j >= ny) {
+          j = 0;
+          i = (i + 1) % nx;
+        }
+      } else {
+        i++;
+        if (i >= nx) {
+          i = 0;
+          j = (j + 1) % ny;
+        }
+      }
+      selected = { i: Math.max(0, i), j: Math.max(0, j) };
       redraw();
       break;
     }
