@@ -38,7 +38,8 @@ const errors = [];
 const EXPORT_SVG = readFileSync(join(HERE, '..', 'tests', 'fixtures', 'example-export.svg'));
 const PATTERN_SVG = readFileSync(join(HERE, '..', 'tests', 'fixtures', 'example-pattern.svg'));
 const CUT_LIST = 'Grain-Nest cut list\nGenerated: now\n====\n\nPIECES\n  6 Skirt Front C1MOF.svg ×1\n  7 Skirt Back C2M.svg ×2\n\nTOTAL FABRIC NEEDED\n  1.2 m\n';
-const SAMPLE_CSV = 'Name,Status,High bust,Full bust / chest,Waist,Hips,Wrist circumference\nAv,Current,36 in,40.5 in,34 in,44 in,6.25 in\nMum,Current,38 in,42 in,37 in,44 in,6.5 in\n';
+// Made-up people with round numbers; nothing here is anyone's real measurement.
+const SAMPLE_CSV = 'Name,Status,High bust,Full bust / chest,Waist,Hips,Wrist circumference\nAsh,Current,34 in,37.5 in,30 in,40 in,6 in\nNan,Current,36 in,40 in,35 in,42 in,6.5 in\n';
 
 async function run(name, { width, dark }) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: dark ? 'dark' : 'light', permissions: ['clipboard-read', 'clipboard-write'] });
@@ -85,13 +86,13 @@ async function run(name, { width, dark }) {
   await page.setInputFiles('#people-file', { name: 'Measurements.csv', mimeType: 'text/csv', buffer: Buffer.from(SAMPLE_CSV) });
   await page.waitForTimeout(100);
   const names = await page.$$eval('.people tbody td:first-child', (tds) => tds.map((t) => t.textContent));
-  if (names.join(',') !== 'Av,Mum') errors.push(`${name}: people ${names}`);
+  if (names.join(',') !== 'Ash,Nan') errors.push(`${name}: people ${names}`);
   await go('bust');
-  await page.selectOption('#bust-person', 'Mum');
+  await page.selectOption('#bust-person', 'Nan');
   await page.waitForTimeout(30);
   const high = await page.inputValue('#bust-high');
   const cup = await page.$eval('.headline .value', (e) => e.textContent);
-  if (high !== '96.52' || cup !== 'D') errors.push(`${name}: fill from Mum gave ${high} / ${cup}`);
+  if (high !== '91.44' || cup !== 'D') errors.push(`${name}: fill from Nan gave ${high} / ${cup}`);
   // Grain-Nest files: seams from an export, pieces from a pattern, a cut list to tick
   await go('thread');
   await page.setInputFiles('#thread-svg', { name: 'example-export.svg', mimeType: 'image/svg+xml', buffer: EXPORT_SVG });
