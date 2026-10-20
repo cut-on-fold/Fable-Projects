@@ -1,6 +1,6 @@
 {
   "name": "lantern",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Projector cutting for sewing patterns with a calibration that bends: more than four points, so a table with a dip or a lens with a bulge still projects true",
   "private": true,
   "license": "MIT",
