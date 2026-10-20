@@ -130,6 +130,18 @@ async function run(name, { dark }) {
   // the inner point sits where the corners' homography puts it: on the (bent) top edge between the corners
   await page.screenshot({ path: join(SHOTS, `${name}-calibrate.png`) });
 
+  // Tab walks the points along the row and wraps; Shift+Tab goes down the column: from the corner, two right and one down, then a nudge.
+  const beforeTab = s.calibrations[0].mesh.points;
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(250);
+  s = await stored();
+  const afterTab = s.calibrations[0].mesh.points;
+  const movedIdx = afterTab.map((p, k) => (Math.abs(p.x - beforeTab[k].x) > 1e-6 || Math.abs(p.y - beforeTab[k].y) > 1e-6 ? k : -1)).filter((k) => k >= 0);
+  if (movedIdx.join() !== String(1 * 4 + 2) || Math.round(afterTab[6].x - beforeTab[6].x) !== 1) errors.push(`${name}: Tab then nudge moved points ${movedIdx} (column 2, row 1 is 6)`);
+
   // The camera window: a (fake) webcam picture, zoom, the four corners clicked, all remembered.
   await page.click('#camera');
   await page.waitForTimeout(800);

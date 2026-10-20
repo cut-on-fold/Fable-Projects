@@ -213,7 +213,7 @@ export class CameraPanel {
     const s = this.host.getSetup();
     if (!s.corners) this.say(`Showing the whole picture. Find corners lets the view follow the selected point; a click looks there instead.${sel ? ` Selected: ${sel.label}.` : ''}`);
     else if (this.manualCentre) this.say(`Looking where you clicked. Select another point to follow it again.`);
-    else this.say(sel ? `Following ${sel.label}. Arrow keys nudge it; [ and ] pick the next.` : 'Select a point to follow it.');
+    else this.say(sel ? `Following ${sel.label}. Arrow keys nudge it; Tab picks the next along the row, Shift+Tab down.` : 'Select a point to follow it.');
   }
 
   /** The map from video pixels to the canvas's CSS pixels. */

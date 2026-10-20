@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.1** — Tab and Shift+Tab walk the calibration points along
+      the row and down the column; the arms of each cross stop short of the
+      centre so a painted dot on the mat sits in a clear hole.
 - [x] **Lantern v0.3.0** — a camera window for calibrating from a chair: a
       webcam over the table in a small window that zooms in on the selected
       point once the four corners have been clicked in the picture, so the
