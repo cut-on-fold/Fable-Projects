@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Phone pocket** — a printed ceiling pocket for the camera phone: a
+      plate with slide channels, a tray with a camera window that slides on,
+      the phone dropped in loose. Parametric OpenSCAD plus STLs.
 - [x] **Lantern v0.3.4** — the arms of each calibration cross run along the
       grid lines through the point, turned with the table, instead of level
       with the screen.

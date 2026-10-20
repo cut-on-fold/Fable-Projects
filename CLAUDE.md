@@ -25,6 +25,8 @@ one person, metric for fabric and inches for body measurements).
   `scripts/smoke.mjs` clicks through the built page in headless Chromium.
 - `calibration/` — `make.mjs` writes the SVG test cards in `cards/`; CI checks
   the committed cards match the script.
+- `mount/` — `phone-pocket.scad`, a printed ceiling pocket for the phone
+  Lantern uses as a camera, with STLs exported from it (OpenSCAD 2021.01).
 - `site/` — the landing page; the Pages workflow copies each project's `dist`
   under it (`/thimble/`, `/bolt-end/`, `/lantern/`).
 - `IDEAS.md` — the running list; tick things off under Shipped with the
