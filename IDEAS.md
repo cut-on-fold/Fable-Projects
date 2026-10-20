@@ -55,8 +55,9 @@ like to know:
       to check the calibration on the fabric without a tape.
 - [ ] **Mark and annotate** — a line snapped onto a grainline or a fold, kept
       with the placement.
-- [ ] **Camera calibration** — a phone photo of the projected grid on the mat
-      to place the points, instead of dragging each one.
+- [ ] **Camera calibration** — the camera window is there; the next step is
+      for Lantern to find the projected cross and the nearest mat line in the
+      picture itself and nudge the point until they meet, point by point.
 - [ ] **Shared calibrations** — export a table as a file so a second device
       driving the same projector can use it.
 
@@ -69,6 +70,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.0** — a camera window for calibrating from a chair: a
+      webcam over the table in a small window that zooms in on the selected
+      point once the four corners have been clicked in the picture, so the
+      arrow keys do the aligning while the mat is watched on screen.
 - [x] **Lantern v0.2.0** — points at a chosen spacing (every 6 in or 15 cm,
       counted from the corner, so each sits on a mat line) instead of a
       count; an Add points button; a calibration card for the current table

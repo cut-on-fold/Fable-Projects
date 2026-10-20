@@ -20,7 +20,8 @@ one person, metric for fabric and inches for body measurements).
   pdf.js (legacy build, worker bundled) and WebGL 2. `src/calc/homography.ts`
   is the four-corner map, `src/calc/mesh.ts` the mesh of nudges on top of it,
   `src/calc/placement.ts` where the page sits; `src/render.ts` draws through
-  the mesh, `src/document.ts` opens PDFs and SVGs, `src/main.ts` is the page.
+  the mesh, `src/document.ts` opens PDFs and SVGs, `src/camera.ts` is the
+  webcam window, `src/main.ts` is the page. `calibration/card.mjs` is shared.
   `scripts/smoke.mjs` clicks through the built page in headless Chromium.
 - `calibration/` — `make.mjs` writes the SVG test cards in `cards/`; CI checks
   the committed cards match the script.

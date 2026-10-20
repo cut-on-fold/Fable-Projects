@@ -63,7 +63,7 @@ const CARD = readFileSync(join(HERE, '..', '..', 'calibration', 'cards', 'projec
 
 const browser = await chromium.launch({
   executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
 });
 const errors = [];
 
@@ -90,7 +90,7 @@ async function inkPixels(page, inverted) {
 }
 
 async function run(name, { dark }) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: dark ? 'dark' : 'light' });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: dark ? 'dark' : 'light', permissions: ['camera'] });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${name}: console ${m.text()}`); });
@@ -111,6 +111,7 @@ async function run(name, { dark }) {
   await page.waitForTimeout(250);
   let s = await stored();
   const tl = s.calibrations[0].mesh.points[0];
+  await page.evaluate(() => document.activeElement?.blur()); // out of the spacing box, so keys reach the page
   await page.keyboard.press('h'); // the corner may sit under the toolbar
   await page.mouse.move(tl.x, tl.y);
   await page.mouse.down();
@@ -128,6 +129,32 @@ async function run(name, { dark }) {
   if (s.calibrations[0].mesh.points.length !== 12 || s.calibrations[0].mesh.xs.join() !== '0,30,60,90') errors.push(`${name}: stored mesh ${JSON.stringify(s.calibrations[0].mesh.xs)} ${s.calibrations[0].mesh.points.length} points`);
   // the inner point sits where the corners' homography puts it: on the (bent) top edge between the corners
   await page.screenshot({ path: join(SHOTS, `${name}-calibrate.png`) });
+
+  // The camera window: a (fake) webcam picture, zoom, the four corners clicked, all remembered.
+  await page.click('#camera');
+  await page.waitForTimeout(800);
+  const camShown = await page.evaluate(() => {
+    const c = document.getElementById('cam-canvas');
+    if (!c) return 'no canvas';
+    const ctx = c.getContext('2d');
+    const px = ctx.getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] + px[i + 1] + px[i + 2] > 60) lit++;
+    return lit > (c.width * c.height) / 20 ? 'ok' : `dark (${lit} lit px)`;
+  });
+  if (camShown !== 'ok') errors.push(`${name}: camera picture ${camShown}: ${await page.textContent('#cam-status')}`);
+  await page.click('#cam-zoom-2');
+  if ((await page.getAttribute('#cam-zoom-2', 'aria-pressed')) !== 'true') errors.push(`${name}: camera zoom`);
+  await page.click('#cam-corners');
+  const box = await page.locator('#cam-canvas').boundingBox();
+  for (const [fx, fy] of [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]]) await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+  await page.waitForTimeout(250);
+  s = await stored();
+  if (!s.calibrations[0].camera || s.calibrations[0].camera.corners?.length !== 4 || s.calibrations[0].camera.zoom !== 2) errors.push(`${name}: camera setup stored ${JSON.stringify(s.calibrations[0].camera)}`);
+  if (!/Following/.test(await page.textContent('#cam-status'))) errors.push(`${name}: camera status ${await page.textContent('#cam-status')}`);
+  await page.screenshot({ path: join(SHOTS, `${name}-camera.png`) });
+  await page.click('#cam-close');
+  if (await page.$('#cam')) errors.push(`${name}: camera window did not close`);
 
   // Reload: the calibration is still there.
   await page.reload();

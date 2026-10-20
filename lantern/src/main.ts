@@ -1,12 +1,13 @@
 import './styles.css';
 import type { Pt } from './calc/homography';
 import {
-  cellLines, cols, foldedCells, gridLines, isCornersOnly, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, rows, screenToTable,
+  cellLines, cols, corners, foldedCells, gridLines, isCornersOnly, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, rows, screenToTable,
   spacing, tablePointAt, tableToScreen, triangulate, withPoint, withSize, withSpacing, type Mesh,
 } from './calc/mesh';
 import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement, rotated, tableToPage, type PageSize, type Placement } from './calc/placement';
 import { openFile, type Opened } from './document';
 import { card } from '../../calibration/card.mjs';
+import { CameraPanel, defaultCameraSetup, parseCameraSetup, type CameraSetup } from './camera';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
 
@@ -24,6 +25,8 @@ interface Calibration {
   mesh: Mesh;
   /** The window the mesh was made in, so a different one can be pointed out. */
   screen: ScreenInfo | null;
+  /** The webcam over this table, if one is used. */
+  camera: CameraSetup;
 }
 
 interface State {
@@ -59,7 +62,7 @@ function freshCalibration(name: string, unit: Unit): Calibration {
     { x: W - mx, y: H - my },
     { x: mx, y: H - my },
   ]);
-  return { name, mesh, screen: null };
+  return { name, mesh, screen: null, camera: defaultCameraSetup() };
 }
 
 function load(): State {
@@ -83,7 +86,7 @@ function load(): State {
     if (Array.isArray(p.calibrations)) {
       for (const c of p.calibrations as Array<Partial<Calibration>>) {
         const mesh = parseMesh(c?.mesh);
-        if (mesh && typeof c.name === 'string') calibrations.push({ name: c.name, mesh, screen: c.screen && typeof c.screen.w === 'number' ? c.screen : null });
+        if (mesh && typeof c.name === 'string') calibrations.push({ name: c.name, mesh, screen: c.screen && typeof c.screen.w === 'number' ? c.screen : null, camera: parseCameraSetup(c.camera) });
       }
     }
     return {
@@ -138,6 +141,7 @@ let renderToken = 0;
 
 // Calibration interaction
 let selected: { i: number; j: number } | null = { i: 0, j: 0 };
+let cameraPanel: CameraPanel | null = null;
 let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number } | { kind: 'pattern'; last: Pt } | null = null;
 let meshDirty = true;
 
@@ -290,6 +294,7 @@ function buildBar(): void {
     const view = el(
       'div',
       { class: 'group' },
+      btn('Camera', { id: 'camera', 'aria-pressed': String(!!cameraPanel), title: 'A webcam over the table, zoomed in on the selected point, so you can calibrate sitting down', onclick: toggleCamera }),
       btn('Invert', { id: 'invert', 'aria-pressed': String(state.invert), onclick: () => toggle('invert') }, 'I'),
       btn('Full screen', { id: 'fullscreen', onclick: toggleFullscreen }),
       btn('Hide tools', { id: 'hide', onclick: () => setBarHidden(true) }, 'H'),
@@ -438,6 +443,8 @@ function renderPop(): void {
         el('li', {}, el('kbd', { text: 'R' }), ' turn 90°, ', el('kbd', { text: ',' }), ' ', el('kbd', { text: '.' }), ' turn 1° either way, ', el('kbd', { text: 'F' }), ' flip left–right, ', el('kbd', { text: 'V' }), ' flip top–bottom, ', el('kbd', { text: '0' }), ' recentre'),
         el('li', {}, el('kbd', { text: 'I' }), ' invert, ', el('kbd', { text: 'G' }), ' grid, ', el('kbd', { text: 'O' }), ' outline, ', el('kbd', { text: '+' }), ' ', el('kbd', { text: '−' }), ' line weight'),
       ),
+      el('h2', { text: 'Calibrating from a chair' }),
+      el('p', { text: 'Camera opens a webcam over the table (an iPhone on a mount works as a Mac webcam) in a small window. Press Find corners and click the four corner crosses in the picture once; after that the window zooms in on whichever point is selected, so you can nudge it with the arrow keys and move on with [ and ] while watching the mat on screen. The camera needs the page served over https or from localhost.' }),
       el('h2', { text: 'Calibrating with a tape' }),
       el('p', { text: 'No gridded mat, as on a floor? Mark a rectangle of the size in the boxes with tape, drag the corners onto it, then lay a tape measure along each grid line: every point is labelled with its distance from the top-left corner.' }),
       el('p', {}, 'Each table keeps its own calibration; the window size it was made in is remembered, so calibrate in full screen and project in full screen. Lantern ', `v${__LANTERN_VERSION__}`, '.'),
@@ -449,7 +456,37 @@ function renderPop(): void {
 
 // ---------- actions
 
+function toggleCamera(): void {
+  if (cameraPanel) {
+    cameraPanel.close();
+    return;
+  }
+  const panel = new CameraPanel({
+    getSetup: () => cal().camera,
+    setSetup: (c) => {
+      cal().camera = c;
+      save();
+    },
+    screenCorners: () => corners(mesh()),
+    selected: () => {
+      if (!selected) return null;
+      const m = mesh();
+      if (selected.i > cols(m) || selected.j > rows(m)) return null;
+      return { screen: pointAt(m, selected.i, selected.j), label: coords(tablePointAt(m, selected.i, selected.j)), key: `${selected.i},${selected.j}` };
+    },
+    onClose: () => {
+      cameraPanel = null;
+      document.getElementById('camera')?.setAttribute('aria-pressed', 'false');
+    },
+  });
+  cameraPanel = panel;
+  app.append(panel.root);
+  document.getElementById('camera')?.setAttribute('aria-pressed', 'true');
+  void panel.start();
+}
+
 function setMode(mode: State['mode']): void {
+  if (mode !== 'calibrate') cameraPanel?.close();
   state.mode = mode;
   popOpen = null;
   renderPop();
@@ -493,6 +530,7 @@ function setBarHidden(hidden: boolean): void {
 
 function switchCalibration(i: number): void {
   if (i < 0 || i >= state.calibrations.length) return;
+  cameraPanel?.close();
   state.current = i;
   selected = { i: 0, j: 0 };
   meshDirty = true;
@@ -721,12 +759,14 @@ function draw(): void {
         ctx.lineWidth = 2;
         ctx.strokeStyle = isSel ? chalk : accent;
         ctx.stroke();
+        // the selected point gets long arms, so it is easy to find in a camera picture
+        const arm = isSel ? 40 : 14;
         ctx.beginPath();
-        ctx.moveTo(p.x - 14, p.y);
-        ctx.lineTo(p.x + 14, p.y);
-        ctx.moveTo(p.x, p.y - 14);
-        ctx.lineTo(p.x, p.y + 14);
-        ctx.lineWidth = 1;
+        ctx.moveTo(p.x - arm, p.y);
+        ctx.lineTo(p.x + arm, p.y);
+        ctx.moveTo(p.x, p.y - arm);
+        ctx.lineTo(p.x, p.y + arm);
+        ctx.lineWidth = isSel ? 2 : 1;
         ctx.stroke();
         const label = coords(tablePointAt(m, i, j));
         const right = i < cols(m) / 2;
