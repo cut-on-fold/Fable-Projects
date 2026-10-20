@@ -70,6 +70,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.2** — calibration handles redrawn for a mat with painted
+      dots: every ring has a clear, lit centre with nothing drawn over it, and
+      the selected point is a big chalk-coloured ring with long arms pointing
+      in at the dot instead of a filled disc that hid it.
 - [x] **Lantern v0.3.1** — Tab and Shift+Tab walk the calibration points along
       the row and down the column; the arms of each cross stop short of the
       centre so a painted dot on the mat sits in a clear hole.

@@ -752,24 +752,24 @@ function draw(): void {
       for (let i = 0; i <= cols(m); i++) {
         const p = pointAt(m, i, j);
         const isSel = !!selected && selected.i === i && selected.j === j;
+        // Every handle is a ring with a clear, lit centre, so a dot painted on the mat crossing shows in the
+        // middle of it. The selected one is bigger, in the chalk colour, with long arms pointing in at the dot;
+        // the others are small with short stubs. Nothing is drawn over the centre.
+        const r = isSel ? 16 : 10;
+        const arm = isSel ? 48 : 18;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, isSel ? 13 : 11, 0, Math.PI * 2);
-        // Inverted, the inside of the ring is lit a little so a dot on the mat shows inside it.
-        ctx.fillStyle = isSel ? chalk : state.invert ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.85)';
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = state.invert ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)';
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = isSel ? 3 : 1.5;
         ctx.strokeStyle = isSel ? chalk : accent;
         ctx.stroke();
-        // the selected point gets long arms, so it is easy to find in a camera picture
-        // The arms stop short of the centre, so a mark on the mat sits in a clear hole with the arms pointing at it.
-        const arm = isSel ? 40 : 14;
-        const gap = isSel ? 8 : 5;
         ctx.beginPath();
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          ctx.moveTo(p.x + dx * gap, p.y + dy * gap);
+          ctx.moveTo(p.x + dx * (r + 2), p.y + dy * (r + 2));
           ctx.lineTo(p.x + dx * arm, p.y + dy * arm);
         }
-        ctx.lineWidth = isSel ? 2 : 1;
+        ctx.lineWidth = isSel ? 3 : 1.5;
         ctx.stroke();
         const label = coords(tablePointAt(m, i, j));
         const right = i < cols(m) / 2;

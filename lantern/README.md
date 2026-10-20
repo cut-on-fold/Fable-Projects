@@ -29,9 +29,10 @@ is labelled with, so the picture bends to follow the surface.
    at the crossings, labelled with their distance from the corner; drag each
    one onto that crossing on the mat. Arrow keys nudge the selected point a
    pixel at a time; `Tab` picks the next one along the row and `Shift+Tab` the
-   next one down the column (`[` and `]` go back and forth). The arms of each
-   cross stop short of the centre, so a dot painted on the mat crossing sits in
-   a clear hole with the arms pointing at it. **Corners only** forgets
+   next one down the column (`[` and `]` go back and forth). Every circle has a
+   clear centre with nothing drawn over it, so a dot painted on the mat
+   crossing shows in the middle; the selected one is bigger, in the chalk
+   colour, with long arms pointing in at the dot. **Corners only** forgets
    the inner points.
 3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
    `,` and `.` for 1°), flip it (`F` across, `V` down), invert for white lines
