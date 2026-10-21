@@ -81,8 +81,11 @@ point in turn; the camera sees the ring and the dot, and the point is moved
 until the ring is centred on the dot, to about half a millimetre, usually in
 two or three goes. The tools and the camera window hide while it runs, and
 `Esc` stops it. A dot it cannot see, under the laptop or a tool, is left
-where it was and listed at the end. It works best with the room lights down,
-so the projector is the brightest thing the camera sees. The seeing is in
+where it was and listed at the end, with the reason and the numbers behind
+it. **Camera frames** then saves a picture of what the camera saw at the
+last points tried (the plain frame, the frame with the ring, what darkened,
+what scored as orange), to look at or to send. It works best with the room
+lights down, so the projector is the brightest thing the camera sees. The seeing is in
 `src/calc/vision.ts`: a frame with the ring minus a frame without leaves
 only the ring, so the mat's own lines and anything lying on it cancel out.
 

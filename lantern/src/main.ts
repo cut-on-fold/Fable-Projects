@@ -8,7 +8,8 @@ import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement
 import { openFile, type Opened } from './document';
 import { card } from '../../calibration/card.mjs';
 import { CameraPanel, defaultCameraSetup, parseCameraSetup, type CameraSetup } from './camera';
-import { autoCalibrate, summarise, type AutoHost } from './autocal';
+import { autoCalibrate, summarise, type AutoHost, type Diagnostic } from './autocal';
+import { orangeScore } from './calc/vision';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
 
@@ -149,6 +150,8 @@ let autoRun: { stop: boolean } | null = null;
 let autoRing: Pt | null = null;
 let autoText = '';
 let autoSummary: string | null = null;
+/** What the camera saw at the last points set, newest last, for the Camera frames picture. */
+let autoDiagnostics: Diagnostic[] = [];
 let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number } | { kind: 'pattern'; last: Pt } | null = null;
 let meshDirty = true;
 
@@ -303,6 +306,7 @@ function buildBar(): void {
       { class: 'group' },
       btn('Camera', { id: 'camera', 'aria-pressed': String(!!cameraPanel), title: 'A webcam over the table, zoomed in on the selected point, so you can calibrate sitting down', onclick: toggleCamera }),
       btn('Auto', { id: 'auto', disabled: !cameraPanel?.homography(), title: 'Set every point from the camera: a ring is projected at each and moved until it is centred on the painted dot. Needs the camera open with its corners found, orange dots on the mat crossings, and the room not too bright.', onclick: () => void runAuto(allPoints()) }, 'A'),
+      btn('Camera frames', { id: 'frames', disabled: !autoDiagnostics.length, title: 'Save a picture of what the camera saw at the last points Auto tried, to see why one was skipped', onclick: saveDiagnostics }),
       btn('Invert', { id: 'invert', 'aria-pressed': String(state.invert), onclick: () => toggle('invert') }, 'I'),
       btn('Full screen', { id: 'fullscreen', onclick: toggleFullscreen }),
       btn('Hide tools', { id: 'hide', onclick: () => setBarHidden(true) }, 'H'),
@@ -456,7 +460,7 @@ function renderPop(): void {
       el('h2', { text: 'Calibrating from a chair' }),
       el('p', { text: 'Camera opens a webcam over the table (an iPhone on a mount works as a Mac webcam) in a small window. Press Find corners and click each of the four corner crosses in the picture, roughly first and then close up once the window has zoomed in; after that the window zooms in on whichever point is selected, so you can nudge it with the arrow keys and move on with [ and ] while watching the mat on screen. The camera needs the page served over https or from localhost. With an iPhone, the Mac decides how much of the table the picture shows: while the camera is open, click the green camera icon in the menu bar and set the zoom there to 0.5×, the wide lens. The Mac remembers it for the browser, and sometimes forgets.' }),
       el('h2', { text: 'Setting the points from the camera' }),
-      el('p', { text: 'With orange dots painted on the mat crossings and the camera open with its corners found, Auto (or A for the selected point, Shift+A for all) sets the points itself: the screen goes white, a small black ring is projected at each point, and the point is moved until the ring is centred on the dot, to about half a millimetre. The tools and the camera window hide while it runs; Esc stops it. A dot it cannot see, under the laptop say, is left where it was and listed at the end. It works best with the room lights down, so the projector is the brightest thing the camera sees.' }),
+      el('p', { text: 'With orange dots painted on the mat crossings and the camera open with its corners found, Auto (or A for the selected point, Shift+A for all) sets the points itself: the screen goes white, a small black ring is projected at each point, and the point is moved until the ring is centred on the dot, to about half a millimetre. The tools and the camera window hide while it runs; Esc stops it. A dot it cannot see, under the laptop say, is left where it was and listed at the end, with a reason and the numbers behind it. Camera frames then saves a picture of what the camera saw at the last points tried, to look at or to send. It works best with the room lights down, so the projector is the brightest thing the camera sees.' }),
       el('h2', { text: 'Calibrating with a tape' }),
       el('p', { text: 'No gridded mat, as on a floor? Mark a rectangle of the size in the boxes with tape, drag the corners onto it, then lay a tape measure along each grid line: every point is labelled with its distance from the top-left corner.' }),
       el('p', {}, 'Each table keeps its own calibration; the window size it was made in is remembered, so calibrate in full screen and project in full screen. Lantern ', `v${__LANTERN_VERSION__}`, '.'),
@@ -531,6 +535,7 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
   const run = { stop: false };
   autoRun = run;
   autoSummary = null;
+  autoDiagnostics = [];
   const barWasHidden = state.barHidden;
   setBarHidden(true);
   panel.setHidden(true);
@@ -539,6 +544,10 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
     homography: () => panel.homography(),
     pictureSize: () => panel.pictureSize(),
     grab: (roi) => panel.grab(roi),
+    record: (d) => {
+      autoDiagnostics.push(d);
+      if (autoDiagnostics.length > 12) autoDiagnostics.shift();
+    },
     showRing: async (p) => {
       autoRing = p;
       redraw();
@@ -546,7 +555,7 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
     },
     getPoint: (i, j) => pointAt(mesh(), i, j),
     setPoint: (i, j, p) => setMesh(withPoint(mesh(), i, j, p)),
-    settleMs: 450,
+    settleMs: 700,
     progress: (text) => {
       autoText = text;
       redraw();
@@ -568,6 +577,90 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
     buildBar();
     redraw();
   }
+}
+
+/**
+ * A picture of what the camera saw at the last points Auto tried: for each, the plain frame, the frame with the
+ * ring, the pixels that darkened (the ring as found) and how orange each pixel scored (the dot as found), with
+ * the numbers. Saved as a PNG, to look at or to send.
+ */
+function saveDiagnostics(): void {
+  if (!autoDiagnostics.length) return;
+  const cell = 240;
+  const labelH = 34;
+  const scale = 1;
+  const rowH = cell * scale + labelH;
+  const c = document.createElement('canvas');
+  c.width = cell * scale * 4 + 10 * 5;
+  c.height = rowH * autoDiagnostics.length + 10;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  const put = (frame: { width: number; height: number; data: Uint8ClampedArray }, x: number, y: number) => {
+    const img = new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height);
+    const tmp = document.createElement('canvas');
+    tmp.width = frame.width;
+    tmp.height = frame.height;
+    tmp.getContext('2d')!.putImageData(img, 0, 0);
+    ctx.drawImage(tmp, x, y, cell * scale, cell * scale);
+  };
+  const mark = (x: number, y: number, p: Pt | null, colour: string) => {
+    if (!p) return;
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x + p.x * scale, y + p.y * scale, 10, 0, Math.PI * 2);
+    ctx.stroke();
+  };
+  autoDiagnostics.forEach((d, row) => {
+    const y = 10 + row * rowH;
+    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}`;
+    ctx.fillStyle = '#000';
+    ctx.font = '13px Atkinson Hyperlegible, sans-serif';
+    ctx.fillText(label, 10, y + 16);
+    const top = y + labelH;
+    // 1: the plain frame, with where the corners said the point would be
+    put(d.lit, 10, top);
+    mark(10, top, d.guess, '#2f6f8f');
+    // 2: with the ring
+    if (d.ringed) put(d.ringed, 20 + cell, top);
+    // 3: what darkened
+    const dark = { width: d.lit.width, height: d.lit.height, data: new Uint8ClampedArray(d.lit.data.length) };
+    const orange = { width: d.lit.width, height: d.lit.height, data: new Uint8ClampedArray(d.lit.data.length) };
+    for (let i = 0; i < d.lit.data.length; i += 4) {
+      const a = d.lit.data;
+      const b = d.ringed?.data;
+      const before = 0.299 * a[i]! + 0.587 * a[i + 1]! + 0.114 * a[i + 2]!;
+      const after = b ? 0.299 * b[i]! + 0.587 * b[i + 1]! + 0.114 * b[i + 2]! : before;
+      const v = before - after > 40 ? 0 : 255;
+      dark.data[i] = dark.data[i + 1] = dark.data[i + 2] = v;
+      dark.data[i + 3] = 255;
+      const sc = Math.min(255, orangeScore(a[i]!, a[i + 1]!, a[i + 2]!) * 1.5);
+      orange.data[i] = 255;
+      orange.data[i + 1] = 255 - sc;
+      orange.data[i + 2] = 255 - sc;
+      orange.data[i + 3] = 255;
+    }
+    put(dark, 30 + cell * 2, top);
+    mark(30 + cell * 2, top, d.ring, '#2f6f8f');
+    put(orange, 40 + cell * 3, top);
+    mark(40 + cell * 3, top, d.dot, '#2f6f8f');
+    ctx.fillStyle = '#646b70';
+    ctx.font = '11px Atkinson Hyperlegible, sans-serif';
+    ctx.fillText('plain (blue ring: where expected)', 10, top + cell + 12);
+    ctx.fillText('with the ring', 20 + cell, top + cell + 12);
+    ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px` : 'none'}`, 30 + cell * 2, top + cell + 12);
+    ctx.fillText(`orange score: ${d.dot ? `${d.dot.n} px, peak ${Math.round(d.dot.peak)}` : 'nothing'}`, 40 + cell * 3, top + cell + 12);
+  });
+  c.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: `lantern-camera-frames.png` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
 }
 
 function setMode(mode: State['mode']): void {

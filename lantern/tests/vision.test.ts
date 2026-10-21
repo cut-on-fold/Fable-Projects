@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyHomography, homographyFromPoints, rectCorners } from '../src/calc/homography';
-import { blankFrame, correction, darkenedCentroid, isOrange, luma, nearestBlob, orangeBlobs, paintDisc, type Frame } from '../src/calc/vision';
+import { blankFrame, correction, darkenedCentroid, dotNear, isOrange, luma, nearestBlob, orangeBlobs, orangeScore, paintDisc, type Frame } from '../src/calc/vision';
 
 /** A white mat with faint pencil lines, a pink line and some blue lines, as the camera sees it. */
 function mat(): Frame {
@@ -77,6 +77,40 @@ describe('orangeBlobs and nearestBlob', () => {
     set(f, 9, 0, ORANGE);
     set(f, 0, 1, ORANGE);
     expect(orangeBlobs(f, 1)).toHaveLength(2);
+  });
+});
+
+describe('orangeScore and dotNear', () => {
+  it('scores paint, not the mat', () => {
+    expect(orangeScore(...ORANGE)).toBeGreaterThan(100);
+    expect(orangeScore(255, 215, 170)).toBeGreaterThan(40); // a blurred, pale edge of a dot
+    expect(orangeScore(255, 255, 255)).toBe(0);
+    expect(orangeScore(225, 110, 150)).toBe(0); // pink line
+    expect(orangeScore(90, 110, 200)).toBe(0); // blue line
+    expect(orangeScore(120, 120, 125)).toBe(0); // pencil
+  });
+  it('finds a tiny blurred dot the hard test misses', () => {
+    const f = mat();
+    // a two-pixel dot with pale edges, as the wide lens sees a 4 mm dot: the edges fail the hard test,
+    // so it sees a two-pixel speck and throws it away
+    set(f, 100, 60, [240, 160, 90]);
+    set(f, 101, 60, [240, 160, 90]);
+    set(f, 99, 60, [255, 225, 190]);
+    set(f, 102, 60, [255, 225, 190]);
+    set(f, 100, 59, [255, 228, 195]);
+    set(f, 101, 61, [255, 228, 195]);
+    expect(orangeBlobs(f)).toHaveLength(0);
+    const d = dotNear(f, { x: 96, y: 56 }, 20)!;
+    expect(d).not.toBeNull();
+    expect(Math.abs(d.x - 101)).toBeLessThan(0.6);
+    expect(Math.abs(d.y - 60.5)).toBeLessThan(0.6);
+    expect(d.peak).toBeGreaterThan(100);
+  });
+  it('is null with nothing orange within reach, and reports the best it saw', () => {
+    const f = mat();
+    paintDisc(f, 150, 100, 2, ORANGE);
+    expect(dotNear(f, { x: 40, y: 40 }, 20)).toBeNull();
+    expect(dotNear(f, { x: 140, y: 95 }, 20)).not.toBeNull();
   });
 });
 

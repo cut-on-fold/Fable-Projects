@@ -108,6 +108,60 @@ export function orangeBlobs(frame: Frame, minPixels = 3): Blob[] {
   return blobs.sort((a, b) => b.n - a.n);
 }
 
+/**
+ * How orange a pixel is, 0 for white, grey, blue, pink and pencil, rising
+ * with the paint: red above blue, with green between the two. Soft, so a
+ * dot a few pixels wide and blurred at the edges still scores where a hard
+ * yes-or-no test on each pixel would find nothing.
+ */
+export function orangeScore(r: number, g: number, b: number): number {
+  return Math.max(0, r - b - 0.6 * Math.abs(r + b - 2 * g));
+}
+
+export interface DotFound {
+  /** Centroid, in frame pixels, weighted by how orange each pixel is. */
+  x: number;
+  y: number;
+  /** Pixels that scored. */
+  n: number;
+  /** The best score seen, for the diagnostics. */
+  peak: number;
+}
+
+/**
+ * The dot within `reach` of `centre`: the score-weighted centroid of the
+ * pixels scoring at least `minScore` there, or null if fewer than
+ * `minPixels` do. A single dot is all that is expected within reach (dots
+ * are 15 cm apart and reach is a few cm), so no attempt is made to tell
+ * two apart.
+ */
+export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 40, minPixels = 2): DotFound | null {
+  const { width: w, height: h, data } = frame;
+  let sx = 0;
+  let sy = 0;
+  let sw = 0;
+  let n = 0;
+  let peak = 0;
+  const x0 = Math.max(0, Math.floor(centre.x - reach));
+  const x1 = Math.min(w - 1, Math.ceil(centre.x + reach));
+  const y0 = Math.max(0, Math.floor(centre.y - reach));
+  const y1 = Math.min(h - 1, Math.ceil(centre.y + reach));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (Math.hypot(x + 0.5 - centre.x, y + 0.5 - centre.y) > reach) continue;
+      const i = (y * w + x) * 4;
+      const sc = orangeScore(data[i]!, data[i + 1]!, data[i + 2]!);
+      if (sc > peak) peak = sc;
+      if (sc < minScore) continue;
+      sx += (x + 0.5) * sc;
+      sy += (y + 0.5) * sc;
+      sw += sc;
+      n++;
+    }
+  }
+  return n >= minPixels ? { x: sx / sw, y: sy / sw, n, peak } : null;
+}
+
 /** The blob nearest `p` within `maxDist` pixels, or null. */
 export function nearestBlob(blobs: Blob[], p: Pt, maxDist: number): Blob | null {
   let best: Blob | null = null;

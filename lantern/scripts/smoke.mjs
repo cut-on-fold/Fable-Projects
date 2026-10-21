@@ -196,6 +196,9 @@ async function run(name, { dark }) {
   s = await stored();
   if (JSON.stringify(s.calibrations[0].mesh.points) !== beforeAuto) errors.push(`${name}: Auto moved points with no dots to see`);
   if (await page.isHidden('#bar')) errors.push(`${name}: tools not back after Auto`);
+  // What the camera saw is kept and saved as a picture.
+  const [frames] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.click('#frames')]);
+  if (!frames || frames.suggestedFilename() !== 'lantern-camera-frames.png') errors.push(`${name}: camera frames gave ${frames?.suggestedFilename()}`);
   await page.click('#cam-close');
   if (await page.$('#cam')) errors.push(`${name}: camera window did not close`);
 
