@@ -37,17 +37,57 @@ In [cards/](cards/), ready to use:
 | `print-letter.svg` | Letter | Printing at 100% to check a printer |
 | `print-letter-in.svg` | Letter | The same with an inch grid |
 
+And for drawing a mat for Lantern's automatic calibration:
+
+| File | Size | For |
+|---|---|---|
+| `mat-53x35in-layout.svg` | 53 × 35 in | Lines every 12 in and a dot target every 6 in, to project and draw along |
+| `mat-36x24in-layout.svg` | 36 × 24 in | The same for a large mat |
+| `dot-tile-letter.svg` | Letter | A 6 in cell of dot targets to print at 100%, for marking or checking dots |
+| `dot-tile-a4.svg` | A4 | The same on A4 |
+
 Open a projector card in Lantern or Pattern Projector the same way as a
 Grain-Nest export, calibrate as usual, then measure the squares on the table
 with a tape. The layers (Grid cm or Grid in, Rulers in, Keystone, Calibration,
 Instructions, Border) can be switched off one at a time, so you can project
 just the grid onto fabric to check it is on grain before cutting.
 
+## Drawing a mat
+
+A mat 53 in wide cannot be printed in one piece at home, and twenty pages
+taped together drift at every join, so the accurate way to lay one out is
+to project the layout and check it with a tape:
+
+1. In Lantern, calibrate on the four corners of the mat (or of the
+   rectangle you have measured and marked), with no inner points.
+2. Open `mat-53x35in-layout.svg` as the pattern. It is the size of the
+   table, so it sits corner to corner. Draw along the lines with a long
+   rule, and stick a dot in the middle of each target: the targets are
+   8 mm, every 6 in from the top-left corner and then the far edge, which
+   is exactly where Lantern puts its calibration points, and each is
+   labelled the way Lantern labels the point.
+3. Check with a tape, to the middle of the lines: 12 in between lines, the
+   full width and height, and corner to corner (the numbers are on the
+   card). Any dot is 6 in from its neighbours.
+
+A four-corner calibration is true on a flat table, which is what a mat is
+drawn on; the inner points exist for tables that are not flat. The dot
+tile is for the last mm: print it at 100% (check the 4 in square), lay it
+with two targets on two dots and mark the next two through the centres, or
+lay it over four dots to check them.
+
+Lines in **green** or **blue** (thin, about 1 mm) and dots in **orange** are
+what Auto expects: it takes orange, red-orange and orange vinyl for a dot,
+and never green, blue, grey, pink or red. Yellow and brown are best kept
+off the mat.
+
 ## Any other size
 
-Lantern draws one for whatever table it has: set the size and unit in
-Calibrate, then **Project the card** or **Save card**. That is the same
-drawing as these files, from `card.mjs`.
+Lantern draws a calibration card for whatever table it has: set the size
+and unit in Calibrate, then **Project the card** or **Save card**. That is
+the same drawing as these files, from `card.mjs`. For a mat layout of
+another size, add a line to `LAYOUTS` in `make.mjs` (`lineEvery` and
+`dotEvery` are in mm, `dot` is the dot's diameter) and run it.
 
 ## Remaking them
 

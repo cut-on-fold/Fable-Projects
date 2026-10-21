@@ -110,6 +110,11 @@ like to know:
       counts, so the corners can be placed accurately; and no ring is drawn
       at the window's centre, which sat a little off the projected cross and
       read as the thing to align with. The cross in the video is the target.
+- [x] **Mat layout cards** — `calibration/cards/mat-53x35in-layout.svg`
+      (and 36 × 24 in): lines every 12 in and an 8 mm target for a dot every
+      6 in, placed and labelled as Lantern places its points, to project and
+      draw along; a dot tile for Letter and A4 to print at 100% for marking
+      or checking dots a 6 in cell at a time.
 - [x] **Phone pocket** — a printed ceiling pocket for the camera phone: a
       plate with slide channels, a tray with a camera window that slides on,
       the phone dropped in loose. Parametric OpenSCAD plus STLs.
