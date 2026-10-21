@@ -70,6 +70,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.5** — camera window: Find corners takes two clicks per
+      corner, a rough one that zooms the window in and a close one that
+      counts, so the corners can be placed accurately; and no ring is drawn
+      at the window's centre, which sat a little off the projected cross and
+      read as the thing to align with. The cross in the video is the target.
 - [x] **Phone pocket** — a printed ceiling pocket for the camera phone: a
       plate with slide channels, a tray with a camera window that slides on,
       the phone dropped in loose. Parametric OpenSCAD plus STLs.

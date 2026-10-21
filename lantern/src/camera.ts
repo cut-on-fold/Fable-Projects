@@ -78,6 +78,8 @@ export class CameraPanel {
   /** While clicking the corners: which one is next. */
   private setupStep: number | null = null;
   private setupClicks: Pt[] = [];
+  /** During setup: the rough click the window has zoomed in on, waiting for the close-up click. */
+  private setupNear: Pt | null = null;
   /** A click in the picture to look somewhere else until the selection changes. */
   private manualCentre: Pt | null = null;
   private lastKey: string | null = null;
@@ -203,8 +205,9 @@ export class CameraPanel {
   private startSetup(): void {
     this.setupStep = 0;
     this.setupClicks = [];
+    this.setupNear = null;
     this.manualCentre = null;
-    this.say(`Click the ${CORNER_NAMES[0]} corner cross in the picture (1 of 4).`);
+    this.say(`Click near the ${CORNER_NAMES[0]} corner cross in the picture (1 of 4); the window zooms in for a second, closer click.`);
     this.draw();
   }
 
@@ -226,8 +229,9 @@ export class CameraPanel {
     const s = this.host.getSetup();
     const turned = s.turn === 90 || s.turn === 270;
     const fit = Math.min(W / (turned ? vh : vw), H / (turned ? vw : vh));
-    const zoom = this.setupStep !== null ? 1 : s.zoom;
-    const centre = this.setupStep !== null ? { x: vw / 2, y: vh / 2 } : this.centre(vw, vh);
+    // Setting corners: the whole picture for the rough click, then 4× on that spot for the close one.
+    const zoom = this.setupStep !== null ? (this.setupNear ? 4 : 1) : s.zoom;
+    const centre = this.setupStep !== null ? (this.setupNear ?? { x: vw / 2, y: vh / 2 }) : this.centre(vw, vh);
     return new DOMMatrix()
       .translate(W / 2, H / 2)
       .scale(fit * zoom)
@@ -263,14 +267,21 @@ export class CameraPanel {
     const p = m.inverse().transformPoint(new DOMPoint(e.clientX - r.left, e.clientY - r.top));
     const raw = { x: p.x, y: p.y };
     if (this.setupStep !== null) {
-      this.setupClicks.push(raw);
-      this.setupStep++;
-      if (this.setupStep < 4) {
-        this.say(`Click the ${CORNER_NAMES[this.setupStep]} corner cross in the picture (${this.setupStep + 1} of 4).`);
+      if (!this.setupNear) {
+        // the rough click: zoom in there and ask for the close one
+        this.setupNear = raw;
+        this.say(`Now click the ${CORNER_NAMES[this.setupStep]} corner cross itself, close up (${this.setupStep + 1} of 4).`);
       } else {
-        this.setupStep = null;
-        this.update({ corners: this.setupClicks });
-        this.sayState();
+        this.setupClicks.push(raw);
+        this.setupNear = null;
+        this.setupStep++;
+        if (this.setupStep < 4) {
+          this.say(`Click near the ${CORNER_NAMES[this.setupStep]} corner cross in the picture (${this.setupStep + 1} of 4).`);
+        } else {
+          this.setupStep = null;
+          this.update({ corners: this.setupClicks });
+          this.sayState();
+        }
       }
     } else {
       this.manualCentre = raw;
@@ -315,14 +326,11 @@ export class CameraPanel {
         ctx.arc(q.x, q.y, 5, 0, Math.PI * 2);
         ctx.fill();
       }
-    } else if (!this.manualCentre && this.host.getSetup().corners && this.host.selected()) {
-      // a faint ring where the selected point is expected: the projected cross should sit on the mat line inside it
-      ctx.strokeStyle = 'rgba(255, 209, 102, 0.8)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(W / 2, H / 2, 22, 0, Math.PI * 2);
-      ctx.stroke();
     }
-    if (!this.setupStep && this.open && this.stream) this.sayState();
+    // Nothing is drawn over the picture while following: the projected cross is there in the video, and a
+    // marker at the window's centre only ever sat a little off it (the corner clicks give a rough map), which
+    // read as something to align with.
+
+    if (this.setupStep === null && this.open && this.stream) this.sayState();
   }
 }
