@@ -55,7 +55,8 @@ Mac webcam through Continuity Camera), press **Camera** in Calibrate. A small
 window shows the picture; press **Find corners** and click each of the four
 corner crosses in it, roughly first and then close up once the window has
 zoomed in on the spot, and from then on the window zooms in on whichever
-point is selected. The projected cross in the picture is the thing to line
+point is selected. Over the picture the pointer is a small open ring, so a
+dot on the mat shows inside it as you click. The projected cross in the picture is the thing to line
 the dot up with; nothing is drawn over it. So: `Tab` to the next point, arrow keys until the
 projected cross sits on the mat line in the picture, next point. The window
 can be dragged and resized, the picture turned, mirrored and zoomed 1× to
