@@ -73,8 +73,9 @@ only just does. The Mac remembers the setting for the browser, separately
 from other apps, and now and then goes back to 1× on its own, so if the
 picture has narrowed, that is where to look. Centre Stage should be off.
 
-**Automatically.** With orange dots painted on the mat crossings (acrylic,
-about 4 mm, two coats) and the camera open with its corners found, **Auto**
+**Automatically.** With orange dots on the mat crossings (acrylic paint,
+about 4 mm, two coats, or 8 mm circles of orange vinyl) and the camera open
+with its corners found, **Auto**
 sets every point itself, or `A` sets the selected one and `Shift+A` all of
 them. The screen goes white and a small black ring is projected at each
 point in turn; the camera sees the ring and the dot, and the point is moved
@@ -93,10 +94,13 @@ thing the camera sees, but it does not need them off: a projected black is
 only a shade darker than the lit mat, and the seeing takes its threshold
 from the picture rather than expecting a fixed contrast. The seeing is in
 `src/calc/vision.ts`: a frame with the ring minus a frame without leaves
-only the ring, so the mat's own lines and anything lying on it cancel out,
-and it looks only around where the ring should be and only on the lit
-mat, since dark things in the picture (a laptop, the floor) flicker from
-frame to frame;
+only the ring, so the mat's own lines and anything lying on it cancel out;
+it looks only around where the ring should be and only on the lit mat,
+since dark things in the picture (a laptop, the floor) flicker from frame
+to frame; and it fits a circle to what it sees, so a corner or edge point
+whose ring is cut off by the screen's edge still gets the ring's true
+centre. The dot is found by hue: orange paint, orange vinyl and a
+red-orange dot count, red and pink mat lines, yellow and brown do not;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.
 
