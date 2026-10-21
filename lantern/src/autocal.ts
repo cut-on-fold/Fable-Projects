@@ -52,7 +52,8 @@ export interface AutoOutcome {
 const ROI = 240; // camera px, square, around where the point is expected
 const DOT_REACH = 60; // camera px: how far from the ring to look for the dot
 const RING_PIXELS = 30; // darkened pixels that count as seeing the ring
-const RING_SPREAD = 40; // camera px: darkening further out than this on average is not a ring
+const RING_REACH = 90; // camera px: how far from where the ring should be to look for it
+const RING_SPREAD = 60; // camera px: darkening further out than this on average is not a ring
 const DOT_SPREAD = 8; // camera px: orange further out than this on average is a line or a smear, not a dot
 const DONE_GAP = 0.5; // camera px
 const MAX_STEP = 60; // screen px per go, as a safety stop
@@ -99,6 +100,8 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
   };
 
   let gap = NaN;
+  // where the ring should land: first where the corners say, then on the dot it was sent towards
+  let expected = guessInRoi;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (host.stopped()) return finish({ i, j, ok: false, gap, reason: 'stopped' });
     await host.showRing(p);
@@ -106,10 +109,11 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     const ringed = await host.grab(roi);
     if (!ringed) return finish({ i, j, ok: false, gap, reason: 'no camera picture' });
     diag.ringed = ringed;
-    const ring = darkenedCentroid(lit, ringed, RING_PIXELS);
+    const near = { ...expected, r: RING_REACH };
+    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near);
     diag.ring = ring;
     if (!ring) {
-      const seen = darkenedCentroid(lit, ringed, 1);
+      const seen = darkenedCentroid(lit, ringed, 1, 10, near);
       return finish({ i, j, ok: false, gap, reason: `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)` });
     }
     if (ring.spread > RING_SPREAD) {
@@ -121,6 +125,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     if (dot.spread > DOT_SPREAD) {
       return finish({ i, j, ok: false, gap, reason: `the orange near the ring is a line or a smear, not a dot (spread ${Math.round(dot.spread)} px, ${DOT_SPREAD} at most)` });
     }
+    expected = { x: dot.x, y: dot.y };
     const ringCam = { x: ring.x + roi.x, y: ring.y + roi.y };
     const dotCam = { x: dot.x + roi.x, y: dot.y + roi.y };
     const was = gap;

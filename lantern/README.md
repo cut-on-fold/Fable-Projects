@@ -93,7 +93,10 @@ thing the camera sees, but it does not need them off: a projected black is
 only a shade darker than the lit mat, and the seeing takes its threshold
 from the picture rather than expecting a fixed contrast. The seeing is in
 `src/calc/vision.ts`: a frame with the ring minus a frame without leaves
-only the ring, so the mat's own lines and anything lying on it cancel out;
+only the ring, so the mat's own lines and anything lying on it cancel out,
+and it looks only around where the ring should be and only on the lit
+mat, since dark things in the picture (a laptop, the floor) flicker from
+frame to frame;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.
 

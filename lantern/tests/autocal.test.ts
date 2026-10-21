@@ -25,6 +25,8 @@ interface Table {
   lines: { xs: number[]; ys: number[] };
   /** How much darker a projected black is than the mat, 1 being not at all. */
   black: number;
+  /** Dark things in the picture (a laptop, the floor past the mat's edge), which flicker from frame to frame. */
+  dark?: Array<{ x: number; y: number; w: number; h: number }>;
 }
 
 function key(i: number, j: number): string {
@@ -65,6 +67,15 @@ function picture(table: Table, ring: Pt | null, seed: number): Frame {
     s = (s * 1103515245 + 12345) & 0x7fffffff;
     const n = (s % 5) - 2;
     for (let k = 0; k < 3; k++) f.data[i + k] = Math.max(0, Math.min(255, f.data[i + k]! + n));
+  }
+  // dark things flicker far more than the mat does
+  for (const d of table.dark ?? []) {
+    for (let y = d.y; y < d.y + d.h; y++) {
+      for (let x = d.x; x < d.x + d.w; x++) {
+        s = (s * 1103515245 + 12345) & 0x7fffffff;
+        paint(x, y, [60 + (s % 40), 60 + (s % 40), 65 + (s % 40)]);
+      }
+    }
   }
   return f;
 }
@@ -143,6 +154,18 @@ describe('autoPoint', () => {
     const dot = table.dots.get(key(1, 1))!;
     expect(Math.hypot(landed.x - dot.x, landed.y - dot.y)).toBeLessThan(1);
     expect(f.progress.length).toBeLessThanOrEqual(4);
+  });
+  it('is not put off by a laptop or the floor flickering in the picture', async () => {
+    const { table, points } = grid({ x: 24, y: -18 });
+    const corner = table.dots.get(key(0, 0))!;
+    const edge = table.dots.get(key(1, 2))!;
+    table.dark = [
+      { x: 0, y: 0, w: Math.round(corner.x) - 30, h: Math.round(corner.y) + 40 }, // a laptop by the corner
+      { x: 0, y: Math.round(edge.y) + 45, w: PIC.w, h: 100 }, // the floor past the mat's edge
+    ];
+    const f = fake(table, points);
+    expect((await autoPoint(f.host, 0, 0)).ok).toBe(true);
+    expect((await autoPoint(f.host, 1, 2)).ok).toBe(true);
   });
   it('sees a ring that is only a shade darker than the mat', async () => {
     const { table, points } = grid({ x: -20, y: 16 });

@@ -71,6 +71,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.3** — Auto looks for the ring only around where it
+      should be and only on the lit mat, so a laptop or the floor past the
+      mat's edge flickering between frames no longer gets the ring refused
+      as "scattered".
 - [x] **Lantern v0.4.2** — Auto sees a ring that is only a shade darker
       than the mat (the threshold comes from the picture, not a fixed
       contrast), no longer takes a red mat line for the dot (red with no
