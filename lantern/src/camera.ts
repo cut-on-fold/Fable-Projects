@@ -108,6 +108,7 @@ export class CameraPanel {
       el('button', { type: 'button', class: 'btn', id: 'cam-turn', title: 'Turn the picture a quarter turn', onclick: () => this.update({ turn: (this.host.getSetup().turn + 90) % 360 }) }, 'Turn'),
       el('button', { type: 'button', class: 'btn', id: 'cam-mirror', 'aria-pressed': String(host.getSetup().mirror), title: 'Mirror the picture', onclick: () => this.update({ mirror: !this.host.getSetup().mirror }) }, 'Mirror'),
       el('button', { type: 'button', class: 'btn', id: 'cam-corners', title: 'Click the four corner crosses in the picture, so the view can follow the selected point', onclick: () => this.startSetup() }, 'Find corners'),
+      el('button', { type: 'button', class: 'btn', id: 'cam-snap', title: 'Save the whole camera picture as it is now, to look at or to send', onclick: () => void this.snapshot() }, 'Snapshot'),
       el('button', { type: 'button', class: 'btn', id: 'cam-close', 'aria-label': 'Close the camera', onclick: () => this.close() }, '×'),
     );
     head.addEventListener('pointerdown', (e) => {
@@ -186,6 +187,31 @@ export class CameraPanel {
     ctx.drawImage(this.video, roi.x, roi.y, roi.w, roi.h, 0, 0, roi.w, roi.h);
     const img = ctx.getImageData(0, 0, roi.w, roi.h);
     return { width: img.width, height: img.height, data: img.data };
+  }
+
+  /** Save the whole picture, as the camera sees it (no zoom, turn or mirror), as a PNG. */
+  async snapshot(): Promise<void> {
+    const size = this.pictureSize();
+    if (!size) {
+      this.say('No picture to save yet.');
+      return;
+    }
+    const frame = await this.grab({ x: 0, y: 0, w: size.w, h: size.h });
+    if (!frame) return;
+    const c = document.createElement('canvas');
+    c.width = frame.width;
+    c.height = frame.height;
+    c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = el('a', { href: url, download: 'lantern-camera.png' });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.say(`Saved the picture, ${frame.width} × ${frame.height}, as lantern-camera.png.`);
+    }, 'image/png');
   }
 
   /** Hide the window (the camera keeps running) while the table has to be clear, and bring it back. */

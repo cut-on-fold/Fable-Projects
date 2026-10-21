@@ -71,6 +71,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.6** — Snapshot in the camera window saves the whole
+      picture as the camera sees it, to check the projection from the chair
+      or to send.
 - [x] **Lantern v0.4.5** — at a corner or edge, where only a quarter or
       half of the ring shows, Auto holds the ring's radius at what it must
       be (as drawn, times the camera's scale there, corrected by the rings
