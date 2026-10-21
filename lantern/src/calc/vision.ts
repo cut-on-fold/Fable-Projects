@@ -41,6 +41,13 @@ export interface RingFound extends Blob {
   spread: number;
 }
 
+/** Where to look: within `r` pixels of (x, y). */
+export interface Near {
+  x: number;
+  y: number;
+  r: number;
+}
+
 /**
  * The centroid of the pixels that got darker from `lit` to `ringed`: the
  * projected ring, with everything that did not change cancelled out. Null
@@ -54,20 +61,45 @@ export interface RingFound extends Blob {
  * camera noise. A change in exposure between the two frames would darken
  * (or lighten) everything a little; the middle value of the change over the
  * whole piece is taken as that drift and subtracted first.
+ *
+ * Only the lit mat can show the ring, so pixels that were dark in `lit`
+ * (a laptop, the table's edge, the floor) are left out: they flicker from
+ * frame to frame and would otherwise be taken for darkening. And with
+ * `near` given, only pixels within its reach count, the centre of the
+ * search moving to the centroid found and looking again, a few times, so
+ * that a speck of change elsewhere in the piece cannot pull the ring's
+ * centre about or widen its spread.
  */
-export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floor = 10): RingFound | null {
+export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floor = 10, near?: Near): RingFound | null {
   if (lit.width !== ringed.width || lit.height !== ringed.height) return null;
   const w = lit.width;
   const count = w * lit.height;
   const drops = new Int16Array(count);
+  const litLuma = new Uint8Array(count);
   const hist = new Int32Array(511); // of drop + 255
+  const lumaHist = new Int32Array(256);
+  let cx = near?.x ?? w / 2;
+  let cy = near?.y ?? lit.height / 2;
+  const r = near?.r ?? Infinity;
+  const within = (k: number): boolean => {
+    if (r === Infinity) return true;
+    const x = (k % w) + 0.5;
+    const y = (k - (x - 0.5)) / w + 0.5;
+    return Math.hypot(x - cx, y - cy) <= r;
+  };
+  let inReach = 0;
   for (let k = 0; k < count; k++) {
     const i = k * 4;
     const before = luma(lit.data[i]!, lit.data[i + 1]!, lit.data[i + 2]!);
     const after = luma(ringed.data[i]!, ringed.data[i + 1]!, ringed.data[i + 2]!);
     const d = Math.max(-255, Math.min(255, Math.round(before - after)));
     drops[k] = d;
+    litLuma[k] = Math.round(before);
     hist[d + 255]!++;
+    if (within(k)) {
+      lumaHist[litLuma[k]!]!++;
+      inReach++;
+    }
   }
   let acc = 0;
   let drift = 0;
@@ -78,6 +110,20 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
       break;
     }
   }
+  // the mat is about as bright as the brightest twentieth of what is in reach; anything much darker is not mat
+  acc = 0;
+  let mat = 255;
+  for (let b = 255; b >= 0; b--) {
+    acc += lumaHist[b]!;
+    if (acc * 20 >= inReach) {
+      mat = b;
+      break;
+    }
+  }
+  const litEnough = mat * 0.7;
+  const counts = (k: number): boolean => litLuma[k]! >= litEnough && within(k);
+  hist.fill(0);
+  for (let k = 0; k < count; k++) if (counts(k)) hist[drops[k]! + 255]!++;
   acc = 0;
   let top = 0;
   for (let b = 510; b >= 0; b--) {
@@ -88,31 +134,41 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
     }
   }
   const drop = Math.max(floor, top / 3);
-  let sx = 0;
-  let sy = 0;
-  let sw = 0;
-  let sxx = 0;
-  let syy = 0;
   let n = 0;
+  let spread = 0;
   let peak = 0;
-  for (let k = 0; k < count; k++) {
-    const d = drops[k]! - drift;
-    if (d > peak) peak = d;
-    if (d <= drop) continue;
-    // centroids are of pixel centres, half a pixel in from the index
-    const x = (k % w) + 0.5;
-    const y = (k - (x - 0.5)) / w + 0.5;
-    sx += x * d;
-    sy += y * d;
-    sxx += x * x * d;
-    syy += y * y * d;
-    sw += d;
-    n++;
+  for (let pass = 0; pass < (r === Infinity ? 1 : 5); pass++) {
+    let sx = 0;
+    let sy = 0;
+    let sw = 0;
+    let sxx = 0;
+    let syy = 0;
+    n = 0;
+    peak = 0;
+    for (let k = 0; k < count; k++) {
+      if (!counts(k)) continue;
+      const d = drops[k]! - drift;
+      if (d > peak) peak = d;
+      if (d <= drop) continue;
+      // centroids are of pixel centres, half a pixel in from the index
+      const x = (k % w) + 0.5;
+      const y = (k - (x - 0.5)) / w + 0.5;
+      sx += x * d;
+      sy += y * d;
+      sxx += x * x * d;
+      syy += y * y * d;
+      sw += d;
+      n++;
+    }
+    if (n < minPixels) return null;
+    const nx = sx / sw;
+    const ny = sy / sw;
+    spread = Math.sqrt(Math.max(0, (sxx + syy) / sw - nx * nx - ny * ny));
+    const moved = Math.hypot(nx - cx, ny - cy);
+    cx = nx;
+    cy = ny;
+    if (moved < 0.05) break;
   }
-  if (n < minPixels) return null;
-  const cx = sx / sw;
-  const cy = sy / sw;
-  const spread = Math.sqrt(Math.max(0, (sxx + syy) / sw - cx * cx - cy * cy));
   return { x: cx, y: cy, n, drop, peak, spread };
 }
 

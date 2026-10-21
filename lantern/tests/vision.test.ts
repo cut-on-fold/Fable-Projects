@@ -80,6 +80,34 @@ describe('darkenedCentroid', () => {
     expect(darkenedCentroid(mat(), mat())).toBeNull();
     expect(darkenedCentroid(mat(), blankFrame(10, 10))).toBeNull();
   });
+  it('ignores flicker in the dark parts of the picture, and specks away from where the ring should be', () => {
+    const lit = mat();
+    // a laptop in the corner, dark grey; the floor off the edge, darker still
+    for (let y = 0; y < 60; y++) for (let x = 0; x < 50; x++) set(lit, x, y, [70, 70, 75]);
+    for (let y = 140; y < 160; y++) for (let x = 0; x < 200; x++) set(lit, x, y, [40, 40, 40]);
+    const ringed = { ...lit, data: new Uint8ClampedArray(lit.data) };
+    // the dark parts flicker between frames, by more than the faint ring darkens the mat
+    for (let k = 0; k < 400; k++) {
+      const x = (k * 37) % 50;
+      const y = (k * 53) % 60;
+      set(ringed, x, y, [40, 40, 45]);
+      set(ringed, (k * 41) % 200, 140 + ((k * 7) % 20), [10, 10, 10]);
+    }
+    // and a speck of change on the mat, well away from the ring
+    for (let y = 100; y < 110; y++) for (let x = 170; x < 180; x++) set(ringed, x, y, [200, 200, 200]);
+    dim(ringed, 101.3, 77.6, 14, 9, 0.9);
+    const loose = darkenedCentroid(lit, ringed)!;
+    expect(loose.spread).toBeGreaterThan(30); // the speck and the flicker count without a reach
+    const c = darkenedCentroid(lit, ringed, 30, 10, { x: 110, y: 70, r: 50 })!;
+    expect(c).not.toBeNull();
+    expect(Math.abs(c.x - 101.3)).toBeLessThan(0.3);
+    expect(Math.abs(c.y - 77.6)).toBeLessThan(0.3);
+    expect(c.spread).toBeLessThan(14);
+    // the search walks to the ring from a start a little off, as the corners' guess is
+    const far = darkenedCentroid(lit, ringed, 30, 10, { x: 125, y: 60, r: 50 })!;
+    expect(Math.abs(far.x - 101.3)).toBeLessThan(0.3);
+    expect(Math.abs(far.y - 77.6)).toBeLessThan(0.3);
+  });
   it('reports a wide spread for darkening scattered about, so the caller can refuse it', () => {
     const lit = mat();
     const ringed = mat();
