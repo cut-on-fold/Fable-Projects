@@ -84,6 +84,8 @@ export class CameraPanel {
   private manualCentre: Pt | null = null;
   private lastKey: string | null = null;
   private dragFrom: { x: number; y: number; left: number; top: number } | null = null;
+  /** Where the pointer is over the picture, in canvas CSS px, for the ring drawn in place of the arrow. */
+  private pointer: Pt | null = null;
 
   constructor(private host: CameraHost) {
     this.video.muted = true;
@@ -124,6 +126,17 @@ export class CameraPanel {
     head.addEventListener('pointerup', endDrag);
     head.addEventListener('pointercancel', endDrag);
     this.canvas.addEventListener('click', (e) => this.clicked(e));
+    // The arrow would sit on top of a 4 mm dot, so the pointer is hidden over the picture and a small
+    // open ring is drawn in its place: the dot shows inside the ring, and the click lands at its centre.
+    this.canvas.addEventListener('pointermove', (e) => {
+      const r = this.canvas.getBoundingClientRect();
+      this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (!this.stream) this.draw();
+    });
+    this.canvas.addEventListener('pointerleave', () => {
+      this.pointer = null;
+      if (!this.stream) this.draw();
+    });
     this.root = el('div', { class: 'cam', id: 'cam', role: 'dialog', 'aria-label': 'Camera' }, head, this.canvas, this.status);
     new ResizeObserver(() => this.draw()).observe(this.canvas);
   }
@@ -229,8 +242,8 @@ export class CameraPanel {
     const s = this.host.getSetup();
     const turned = s.turn === 90 || s.turn === 270;
     const fit = Math.min(W / (turned ? vh : vw), H / (turned ? vw : vh));
-    // Setting corners: the whole picture for the rough click, then 4× on that spot for the close one.
-    const zoom = this.setupStep !== null ? (this.setupNear ? 4 : 1) : s.zoom;
+    // Setting corners: the whole picture for the rough click, then 8× on that spot for the close one.
+    const zoom = this.setupStep !== null ? (this.setupNear ? 8 : 1) : s.zoom;
     const centre = this.setupStep !== null ? (this.setupNear ?? { x: vw / 2, y: vh / 2 }) : this.centre(vw, vh);
     return new DOMMatrix()
       .translate(W / 2, H / 2)
@@ -331,6 +344,17 @@ export class CameraPanel {
     // marker at the window's centre only ever sat a little off it (the corner clicks give a rough map), which
     // read as something to align with.
 
+    if (this.pointer) {
+      // the ring in place of the pointer: chalk yellow with a dark edge so it shows on anything
+      ctx.beginPath();
+      ctx.arc(this.pointer.x, this.pointer.y, 11, 0, Math.PI * 2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffd166';
+      ctx.stroke();
+    }
     if (this.setupStep === null && this.open && this.stream) this.sayState();
   }
 }

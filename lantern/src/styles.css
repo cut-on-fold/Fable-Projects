@@ -230,7 +230,7 @@ a { color: var(--accent); }
 .cam-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: move; user-select: none; }
 .cam-head select { border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel); padding: 4px 6px; max-width: 160px; min-height: 30px; }
 .cam-head .btn { min-height: 30px; padding: 3px 8px; }
-.cam canvas { flex: 1; min-height: 0; width: 100%; display: block; background: #000; cursor: crosshair; }
+.cam canvas { flex: 1; min-height: 0; width: 100%; display: block; background: #000; cursor: none; }
 .cam-status { margin: 0; padding: 4px 8px; font-size: 12px; color: var(--muted); }
 .cam-status.warn { color: var(--warn); }
 

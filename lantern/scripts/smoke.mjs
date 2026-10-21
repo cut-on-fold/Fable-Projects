@@ -159,6 +159,20 @@ async function run(name, { dark }) {
   if ((await page.getAttribute('#cam-zoom-2', 'aria-pressed')) !== 'true') errors.push(`${name}: camera zoom`);
   await page.click('#cam-corners');
   const box = await page.locator('#cam-canvas').boundingBox();
+  // the ring drawn in place of the pointer: yellow pixels around where the mouse is
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.waitForTimeout(150);
+  const ring = await page.evaluate(() => {
+    const c = document.getElementById('cam-canvas');
+    const ctx = c.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const px = ctx.getImageData(Math.round(c.width / 2 - 14 * dpr), Math.round(c.height / 2 - 14 * dpr), Math.round(28 * dpr), Math.round(28 * dpr)).data;
+    let yellow = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 200 && px[i + 1] > 170 && px[i + 2] < 140) yellow++;
+    return yellow;
+  });
+  if (ring < 20) errors.push(`${name}: no ring at the pointer (${ring} yellow px)`);
+  if ((await page.$eval('#cam-canvas', (c) => getComputedStyle(c).cursor)) !== 'none') errors.push(`${name}: pointer not hidden over the picture`);
   for (const [fx, fy] of [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]]) {
     await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy); // rough: the window zooms in there
     if (!/close up/.test(await page.textContent('#cam-status'))) errors.push(`${name}: corner setup did not ask for the close click`);

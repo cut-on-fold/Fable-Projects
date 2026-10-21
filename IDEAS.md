@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.7** — over the camera picture the pointer is a small
+      open ring instead of an arrow, so a dot on the mat shows inside it as
+      you click; the close-up corner click is at 8×.
 - [x] **Lantern v0.3.6** — help and README say where the camera's field of
       view is set with an iPhone: the Mac's green camera icon, zoom 0.5× for
       the wide lens, remembered per app and sometimes forgotten.
