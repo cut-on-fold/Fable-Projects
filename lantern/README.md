@@ -60,7 +60,9 @@ dot on the mat shows inside it as you click. The projected cross in the picture 
 the dot up with; nothing is drawn over it. So: `Tab` to the next point, arrow keys until the
 projected cross sits on the mat line in the picture, next point. The window
 can be dragged and resized, the picture turned, mirrored and zoomed 1× to
-8×, and a click in it looks somewhere else until the selection changes. The
+8×, and a click in it looks somewhere else until the selection changes.
+**Snapshot** saves the whole picture as the camera sees it, to check the
+projection from the chair or to send. The
 camera needs the page served over https (the Pages site) or from localhost,
 not opened as a saved file. The camera is never measured: it only decides
 where to zoom, and your eye does the aligning.

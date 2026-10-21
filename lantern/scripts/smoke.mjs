@@ -157,6 +157,9 @@ async function run(name, { dark }) {
   if (camShown !== 'ok') errors.push(`${name}: camera picture ${camShown}: ${await page.textContent('#cam-status')}`);
   await page.click('#cam-zoom-2');
   if ((await page.getAttribute('#cam-zoom-2', 'aria-pressed')) !== 'true') errors.push(`${name}: camera zoom`);
+  // Snapshot saves the whole camera picture
+  const [snap] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.click('#cam-snap')]);
+  if (!snap || snap.suggestedFilename() !== 'lantern-camera.png') errors.push(`${name}: snapshot gave ${snap?.suggestedFilename()}`);
   await page.click('#cam-corners');
   const box = await page.locator('#cam-canvas').boundingBox();
   // the ring drawn in place of the pointer: yellow pixels around where the mouse is
