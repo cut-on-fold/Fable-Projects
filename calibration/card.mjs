@@ -153,6 +153,10 @@ export function card({ width, height, name, purpose, unit = 'cm' }) {
   // ---- border, drawn just inside the page like Grain-Nest's sheet border
   layer('Border', `<rect x="${LINE / 2}" y="${LINE / 2}" width="${r(width - LINE)}" height="${r(height - LINE)}" fill="none" stroke="${BORDER}" stroke-width="${LINE}"/>`);
 
+  return svg(width, height, name, parts);
+}
+
+function svg(width, height, name, parts) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
      width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="sans-serif">
@@ -161,4 +165,145 @@ export function card({ width, height, name, purpose, unit = 'cm' }) {
 ${parts.join('\n')}
 </svg>
 `;
+}
+
+const DOT = '#e8731a'; // the orange of the dots
+const DOT_LABEL = '#646b70';
+
+/** Whole steps from the near edge, then the far edge, as Lantern places its calibration points. */
+export function stops(length, step) {
+  const out = [];
+  for (let k = 0; k * step < length - 1e-6; k++) out.push(k * step);
+  out.push(length);
+  return out;
+}
+
+/** An orange ring the size of a dot with a crosshair that leaves the centre clear, so the dot can be seen to land in the middle. */
+function target(x, y, dot) {
+  const rad = dot / 2;
+  const arm = rad * 0.4;
+  return [
+    `<circle cx="${r(x)}" cy="${r(y)}" r="${r(rad)}" fill="none" stroke="${DOT}" stroke-width="0.5"/>`,
+    `<line x1="${r(x - rad)}" y1="${r(y)}" x2="${r(x - arm)}" y2="${r(y)}" stroke="${DOT}" stroke-width="0.35"/>`,
+    `<line x1="${r(x + arm)}" y1="${r(y)}" x2="${r(x + rad)}" y2="${r(y)}" stroke="${DOT}" stroke-width="0.35"/>`,
+    `<line x1="${r(x)}" y1="${r(y - rad)}" x2="${r(x)}" y2="${r(y - arm)}" stroke="${DOT}" stroke-width="0.35"/>`,
+    `<line x1="${r(x)}" y1="${r(y + arm)}" x2="${r(x)}" y2="${r(y + rad)}" stroke="${DOT}" stroke-width="0.35"/>`,
+  ].join('\n');
+}
+
+/**
+ * A layout for drawing a mat: lines every `lineEvery` (12 in) and a target
+ * for a dot at every `dotEvery` (6 in) crossing, counted from the top-left
+ * corner with the far edge last, the way Lantern places its calibration
+ * points, so a dot stuck in each target is exactly where Auto will look.
+ * Each target is labelled with its distance from the corner in inches, as
+ * Lantern labels the point. Project it through a calibration made on the
+ * four corners of the mat, draw the lines, stick the dots, then check with
+ * a tape: the numbers to check are in the Check layer.
+ */
+export function layout({ width, height, name, purpose, lineEvery = 12 * IN, dotEvery = 6 * IN, dot = 8 }) {
+  const parts = [];
+  const layer = (label, body) =>
+    parts.push(`<g inkscape:groupmode="layer" inkscape:label="${esc(label)}" id="${esc(label.toLowerCase().replace(/\W+/g, '-'))}">\n${body}\n</g>`);
+  const inches = (mm) => `${r(mm / IN)}`;
+
+  {
+    const lines = [];
+    for (let i = 1; i * lineEvery < width - 1e-6; i++) {
+      const x = r(i * lineEvery);
+      lines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="${SEW}" stroke-width="1"/>`);
+      lines.push(`<text x="${r(x + 2)}" y="${r(height / 2)}" font-size="5" fill="${SEW}">${inches(i * lineEvery)} in</text>`);
+    }
+    for (let i = 1; i * lineEvery < height - 1e-6; i++) {
+      const y = r(i * lineEvery);
+      lines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="${SEW}" stroke-width="1"/>`);
+      lines.push(`<text x="${r(width / 2 + 2)}" y="${r(y - 2)}" font-size="5" fill="${SEW}">${inches(i * lineEvery)} in</text>`);
+    }
+    layer(`Lines every ${inches(lineEvery)} in`, lines.join('\n'));
+  }
+
+  const xs = stops(width, dotEvery);
+  const ys = stops(height, dotEvery);
+  {
+    const dots = [];
+    const labels = [];
+    for (const y of ys) {
+      for (const x of xs) {
+        dots.push(target(x, y, dot));
+        const lx = x >= width - dot ? x - dot / 2 - 2 : x + dot / 2 + 1.5;
+        const ly = y >= height - dot ? y - dot / 2 - 1 : y + dot / 2 + 4;
+        labels.push(`<text x="${r(lx)}" y="${r(ly)}" font-size="3.5" fill="${DOT_LABEL}"${x >= width - dot ? ' text-anchor="end"' : ''}>${inches(x)} × ${inches(y)}</text>`);
+      }
+    }
+    layer(`Dots every ${inches(dotEvery)} in`, dots.join('\n'));
+    layer('Labels', labels.join('\n'));
+  }
+
+  {
+    const diagonal = Math.hypot(width, height);
+    const text = [
+      [`${name}: ${purpose}`, true],
+      [`${xs.length} × ${ys.length} dots, ${dot} mm, every ${inches(dotEvery)} in from the top-left corner and then the far edge, with lines every ${inches(lineEvery)} in. Project this through a calibration set on the four corners of the mat, draw along the lines, stick a dot in the middle of each target.`, false],
+      [`Then check with a tape, measuring to the middle of the lines: ${inches(lineEvery)} in between lines, ${inches(width)} in across, ${inches(height)} in down, and corner to corner ${r(diagonal / IN)} in (${r(diagonal)} mm). Any dot is also ${inches(dotEvery)} in from its neighbours.`, false],
+    ];
+    const x0 = dot + 6;
+    const x1 = width - dot - 6;
+    const size = 5;
+    const lineHeight = size * 1.45;
+    const out = [];
+    let y = dot + 8 + size;
+    for (const [para, bold] of text) {
+      for (const line of wrap(para, Math.floor((x1 - x0) / (size * 0.52)))) {
+        out.push(`<text x="${x0}" y="${r(y)}" font-size="${size}" font-weight="${bold ? 700 : 400}" fill="${CUT}">${esc(line)}</text>`);
+        y += lineHeight;
+      }
+      y += lineHeight * 0.3;
+    }
+    layer('Check', out.join('\n'));
+  }
+
+  layer('Border', `<rect x="${LINE / 2}" y="${LINE / 2}" width="${r(width - LINE)}" height="${r(height - LINE)}" fill="none" stroke="${BORDER}" stroke-width="${LINE}"/>`);
+  return svg(width, height, name, parts);
+}
+
+/**
+ * A page to print at 100%: a square of `cell` (6 in) with a dot target at
+ * each corner, for marking or checking dots on a mat a cell at a time, and
+ * a 4 in square to check the printer's scale first.
+ */
+export function tile({ width, height, name, purpose, cell = 6 * IN, dot = 8 }) {
+  const parts = [];
+  const layer = (label, body) =>
+    parts.push(`<g inkscape:groupmode="layer" inkscape:label="${esc(label)}" id="${esc(label.toLowerCase().replace(/\W+/g, '-'))}">\n${body}\n</g>`);
+  const x0 = (width - cell) / 2;
+  const y0 = (height - cell) / 2 + 10;
+  const items = [`<rect x="${r(x0)}" y="${r(y0)}" width="${r(cell)}" height="${r(cell)}" fill="none" stroke="${SEW}" stroke-width="0.5" stroke-dasharray="4 3"/>`];
+  for (const [x, y] of [[x0, y0], [x0 + cell, y0], [x0, y0 + cell], [x0 + cell, y0 + cell]]) items.push(target(x, y, dot));
+  items.push(`<text x="${r(x0 + cell / 2)}" y="${r(y0 + cell / 2)}" text-anchor="middle" font-size="6" fill="${SEW}">${r(cell / IN)} in between dot centres</text>`);
+  layer('Tile', items.join('\n'));
+  const s4 = 4 * IN;
+  layer('Calibration', [
+    `<rect id="calibration-square" inkscape:label="calibration-square" x="${r(width / 2 - s4 / 2)}" y="${r(y0 + cell / 2 - s4 / 2)}" width="${r(s4)}" height="${r(s4)}" fill="none" stroke="${CUT}" stroke-width="0.5"/>`,
+    `<text id="calibration-label" x="${r(width / 2 - s4 / 2)}" y="${r(y0 + cell / 2 + s4 / 2 + 5)}" font-size="4" fill="${CUT}">4 in (101.6 mm) square: measure to check the print is at 100%</text>`,
+  ].join('\n'));
+  {
+    const text = [
+      [`${name}: ${purpose}`, true],
+      [`Print at 100% (no fit to page) and measure the 4 in square. Lay the page on the mat with two targets on two dots already in place, and mark the other two through the centres with a pin or a pencil; or lay it over four dots to check them. The targets are ${dot} mm, the size of a dot.`, false],
+    ];
+    const size = 4;
+    const lineHeight = size * 1.45;
+    const out = [];
+    let y = 12 + size;
+    for (const [para, bold] of text) {
+      for (const line of wrap(para, Math.floor((width - 24) / (size * 0.52)))) {
+        out.push(`<text x="12" y="${r(y)}" font-size="${size}" font-weight="${bold ? 700 : 400}" fill="${CUT}">${esc(line)}</text>`);
+        y += lineHeight;
+      }
+      y += lineHeight * 0.3;
+    }
+    layer('Instructions', out.join('\n'));
+  }
+  layer('Border', `<rect x="${LINE / 2}" y="${LINE / 2}" width="${r(width - LINE)}" height="${r(height - LINE)}" fill="none" stroke="${BORDER}" stroke-width="${LINE}"/>`);
+  return svg(width, height, name, parts);
 }

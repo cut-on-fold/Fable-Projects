@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { IN, card, r } from './card.mjs';
+import { IN, card, layout, r, tile } from './card.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -22,11 +22,31 @@ export const CARDS = [
   { file: 'print-letter-in.svg', width: r(8.5 * IN), height: r(11 * IN), unit: 'in', name: 'Print card Letter, inch grid', purpose: 'print at 100% (no fit to page) to check a printer against an inch ruler' },
 ];
 
+/** Layouts for drawing a mat: lines every 12 in and a target for a dot every 6 in, for Lantern's Auto. */
+export const LAYOUTS = [
+  { file: 'mat-53x35in-layout.svg', width: r(53 * IN), height: r(35 * IN), name: 'Mat layout 53 × 35 in', purpose: 'lines every 12 in and a dot every 6 in, for drawing a cutting table' },
+  { file: 'mat-36x24in-layout.svg', width: r(36 * IN), height: r(24 * IN), name: 'Mat layout 36 × 24 in', purpose: 'lines every 12 in and a dot every 6 in, for drawing a large mat' },
+];
+
+/** A page to print: a 6 in cell with a dot target at each corner. */
+export const TILES = [
+  { file: 'dot-tile-letter.svg', width: r(8.5 * IN), height: r(11 * IN), name: 'Dot tile, Letter', purpose: 'a 6 in cell of dot targets to print at 100%, for marking or checking dots' },
+  { file: 'dot-tile-a4.svg', width: 210, height: 297, name: 'Dot tile, A4', purpose: 'a 6 in cell of dot targets to print at 100%, for marking or checking dots' },
+];
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = join(HERE, 'cards');
   mkdirSync(out, { recursive: true });
   for (const c of CARDS) {
     writeFileSync(join(out, c.file), card(c));
     console.log(`${c.file}  ${c.width} × ${c.height} mm${c.unit === 'in' ? ' (inch grid)' : ''}`);
+  }
+  for (const c of LAYOUTS) {
+    writeFileSync(join(out, c.file), layout(c));
+    console.log(`${c.file}  ${c.width} × ${c.height} mm (layout)`);
+  }
+  for (const c of TILES) {
+    writeFileSync(join(out, c.file), tile(c));
+    console.log(`${c.file}  ${c.width} × ${c.height} mm (tile)`);
   }
 }
