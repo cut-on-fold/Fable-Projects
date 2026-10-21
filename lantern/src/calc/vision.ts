@@ -6,9 +6,9 @@
 // The scheme: with the screen white, a small black ring is projected at a
 // calibration point. A frame with the ring minus a frame without leaves
 // only the ring, whatever is painted or lying on the mat, and its centroid
-// is the ring's centre. The dot is the orange patch nearest that centre in
-// the plain white frame. The difference between the two, turned into screen
-// pixels through the camera map, is how far to move the point.
+// is the ring's centre. The dot is the small orange patch nearest that
+// centre in the plain white frame. The difference between the two, turned
+// into screen pixels through the camera map, is how far to move the point.
 
 import { applyHomography, type Mat3, type Pt } from './homography';
 
@@ -32,90 +32,102 @@ export function luma(r: number, g: number, b: number): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-/**
- * An orange acrylic dot under white light: red well above blue, green well
- * above blue but below red. Pink and red mat lines fail on green, yellow
- * tools fail on red-minus-green, blue lines and pencil fail on everything.
- */
-export function isOrange(r: number, g: number, b: number): boolean {
-  return r > 120 && r - b > 70 && r - g > 30 && g - b > 20;
+export interface RingFound extends Blob {
+  /** How much darker (in luma) a pixel had to get to count, chosen from the picture. */
+  drop: number;
+  /** The biggest darkening seen. */
+  peak: number;
+  /** How far the counted pixels sit from the centre on average (root mean square), in pixels: a ring's radius or so, far more for noise. */
+  spread: number;
 }
 
 /**
- * The centroid of the pixels that got darker from `lit` to `ringed` by more
- * than `drop`: the projected ring, with everything that did not change
- * cancelled out. Null if fewer than `minPixels` changed.
+ * The centroid of the pixels that got darker from `lit` to `ringed`: the
+ * projected ring, with everything that did not change cancelled out. Null
+ * if fewer than `minPixels` did.
+ *
+ * A projected "black" ring on a lit mat is only a shade darker than the
+ * white around it (the room light still falls on it, and the camera sets
+ * its own exposure), so there is no fixed amount of darkening to look for.
+ * Instead the threshold follows the picture: a third of the darkening the
+ * `minPixels`-th darkest pixel showed, never below `floor`, which keeps out
+ * camera noise. A change in exposure between the two frames would darken
+ * (or lighten) everything a little; the middle value of the change over the
+ * whole piece is taken as that drift and subtracted first.
  */
-export function darkenedCentroid(lit: Frame, ringed: Frame, drop = 40, minPixels = 30): Blob | null {
+export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floor = 10): RingFound | null {
   if (lit.width !== ringed.width || lit.height !== ringed.height) return null;
+  const w = lit.width;
+  const count = w * lit.height;
+  const drops = new Int16Array(count);
+  const hist = new Int32Array(511); // of drop + 255
+  for (let k = 0; k < count; k++) {
+    const i = k * 4;
+    const before = luma(lit.data[i]!, lit.data[i + 1]!, lit.data[i + 2]!);
+    const after = luma(ringed.data[i]!, ringed.data[i + 1]!, ringed.data[i + 2]!);
+    const d = Math.max(-255, Math.min(255, Math.round(before - after)));
+    drops[k] = d;
+    hist[d + 255]!++;
+  }
+  let acc = 0;
+  let drift = 0;
+  for (let b = 0; b < 511; b++) {
+    acc += hist[b]!;
+    if (acc * 2 >= count) {
+      drift = b - 255;
+      break;
+    }
+  }
+  acc = 0;
+  let top = 0;
+  for (let b = 510; b >= 0; b--) {
+    acc += hist[b]!;
+    if (acc >= minPixels) {
+      top = b - 255 - drift;
+      break;
+    }
+  }
+  const drop = Math.max(floor, top / 3);
   let sx = 0;
   let sy = 0;
+  let sw = 0;
+  let sxx = 0;
+  let syy = 0;
   let n = 0;
-  const w = lit.width;
-  for (let y = 0; y < lit.height; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      const before = luma(lit.data[i]!, lit.data[i + 1]!, lit.data[i + 2]!);
-      const after = luma(ringed.data[i]!, ringed.data[i + 1]!, ringed.data[i + 2]!);
-      if (before - after > drop) {
-        sx += x;
-        sy += y;
-        n++;
-      }
-    }
+  let peak = 0;
+  for (let k = 0; k < count; k++) {
+    const d = drops[k]! - drift;
+    if (d > peak) peak = d;
+    if (d <= drop) continue;
+    // centroids are of pixel centres, half a pixel in from the index
+    const x = (k % w) + 0.5;
+    const y = (k - (x - 0.5)) / w + 0.5;
+    sx += x * d;
+    sy += y * d;
+    sxx += x * x * d;
+    syy += y * y * d;
+    sw += d;
+    n++;
   }
-  // centroids are of pixel centres, half a pixel in from the index
-  return n >= minPixels ? { x: sx / n + 0.5, y: sy / n + 0.5, n } : null;
-}
-
-/** Connected patches of orange pixels (4-neighbour), at least `minPixels` each, largest first. */
-export function orangeBlobs(frame: Frame, minPixels = 3): Blob[] {
-  const { width: w, height: h, data } = frame;
-  const seen = new Uint8Array(w * h);
-  const blobs: Blob[] = [];
-  const stack: number[] = [];
-  for (let start = 0; start < w * h; start++) {
-    if (seen[start]) continue;
-    const i0 = start * 4;
-    if (!isOrange(data[i0]!, data[i0 + 1]!, data[i0 + 2]!)) {
-      seen[start] = 1;
-      continue;
-    }
-    let sx = 0;
-    let sy = 0;
-    let n = 0;
-    stack.push(start);
-    seen[start] = 1;
-    while (stack.length) {
-      const p = stack.pop()!;
-      const x = p % w;
-      const y = (p - x) / w;
-      sx += x;
-      sy += y;
-      n++;
-      for (const q of [p - 1, p + 1, p - w, p + w]) {
-        if (q < 0 || q >= w * h || seen[q]) continue;
-        if ((q === p - 1 && x === 0) || (q === p + 1 && x === w - 1)) continue;
-        const iq = q * 4;
-        if (isOrange(data[iq]!, data[iq + 1]!, data[iq + 2]!)) {
-          seen[q] = 1;
-          stack.push(q);
-        } else seen[q] = 1;
-      }
-    }
-    if (n >= minPixels) blobs.push({ x: sx / n + 0.5, y: sy / n + 0.5, n });
-  }
-  return blobs.sort((a, b) => b.n - a.n);
+  if (n < minPixels) return null;
+  const cx = sx / sw;
+  const cy = sy / sw;
+  const spread = Math.sqrt(Math.max(0, (sxx + syy) / sw - cx * cx - cy * cy));
+  return { x: cx, y: cy, n, drop, peak, spread };
 }
 
 /**
- * How orange a pixel is, 0 for white, grey, blue, pink and pencil, rising
- * with the paint: red above blue, with green between the two. Soft, so a
- * dot a few pixels wide and blurred at the edges still scores where a hard
- * yes-or-no test on each pixel would find nothing.
+ * How orange a pixel is, 0 for white, grey, blue, pink, pencil and red,
+ * rising with the paint. Orange is red well above blue with green sitting
+ * between the two: the score is the smaller of red-over-blue and twice
+ * green-over-blue, less a penalty when green is not between. A red mat
+ * line under the projector's light has red over blue too, but its green
+ * is no higher than its blue, so it scores nothing. Soft, so a dot a few
+ * pixels wide and blurred at the edges still scores where a hard yes-or-no
+ * test on each pixel would find nothing.
  */
 export function orangeScore(r: number, g: number, b: number): number {
-  return Math.max(0, r - b - 0.6 * Math.abs(r + b - 2 * g));
+  return Math.max(0, Math.min(r - b, 2 * (g - b)) - 0.6 * Math.abs(r + b - 2 * g));
 }
 
 export interface DotFound {
@@ -126,54 +138,63 @@ export interface DotFound {
   n: number;
   /** The best score seen, for the diagnostics. */
   peak: number;
+  /** How far the scoring pixels sit from the centre on average (root mean square), in pixels: a pixel or two for a dot, tens for a line. */
+  spread: number;
 }
 
 /**
  * The dot within `reach` of `centre`: the score-weighted centroid of the
  * pixels scoring at least `minScore` there, or null if fewer than
- * `minPixels` do. A single dot is all that is expected within reach (dots
- * are 15 cm apart and reach is a few cm), so no attempt is made to tell
- * two apart.
+ * `minPixels` do. Only the pixels scoring at least half the best score
+ * count, so a faint false orange (a line, a reflection) does not pull a
+ * real dot's centre about; and `spread` says how big the patch found is,
+ * for the caller to refuse anything but a small, compact dot. A single dot
+ * is all that is expected within reach (dots are 15 cm apart and reach is
+ * a few cm), so no attempt is made to tell two apart.
  */
 export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 40, minPixels = 2): DotFound | null {
   const { width: w, height: h, data } = frame;
-  let sx = 0;
-  let sy = 0;
-  let sw = 0;
-  let n = 0;
-  let peak = 0;
   const x0 = Math.max(0, Math.floor(centre.x - reach));
   const x1 = Math.min(w - 1, Math.ceil(centre.x + reach));
   const y0 = Math.max(0, Math.floor(centre.y - reach));
   const y1 = Math.min(h - 1, Math.ceil(centre.y + reach));
+  const scores = new Float32Array((x1 - x0 + 1) * (y1 - y0 + 1));
+  let peak = 0;
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       if (Math.hypot(x + 0.5 - centre.x, y + 0.5 - centre.y) > reach) continue;
       const i = (y * w + x) * 4;
       const sc = orangeScore(data[i]!, data[i + 1]!, data[i + 2]!);
+      scores[(y - y0) * (x1 - x0 + 1) + (x - x0)] = sc;
       if (sc > peak) peak = sc;
-      if (sc < minScore) continue;
-      sx += (x + 0.5) * sc;
-      sy += (y + 0.5) * sc;
+    }
+  }
+  const threshold = Math.max(minScore, peak / 2);
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let syy = 0;
+  let sw = 0;
+  let n = 0;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const sc = scores[(y - y0) * (x1 - x0 + 1) + (x - x0)]!;
+      if (sc < threshold) continue;
+      const px = x + 0.5;
+      const py = y + 0.5;
+      sx += px * sc;
+      sy += py * sc;
+      sxx += px * px * sc;
+      syy += py * py * sc;
       sw += sc;
       n++;
     }
   }
-  return n >= minPixels ? { x: sx / sw, y: sy / sw, n, peak } : null;
-}
-
-/** The blob nearest `p` within `maxDist` pixels, or null. */
-export function nearestBlob(blobs: Blob[], p: Pt, maxDist: number): Blob | null {
-  let best: Blob | null = null;
-  let bestD = maxDist;
-  for (const b of blobs) {
-    const d = Math.hypot(b.x - p.x, b.y - p.y);
-    if (d <= bestD) {
-      best = b;
-      bestD = d;
-    }
-  }
-  return best;
+  if (n < minPixels) return null;
+  const cx = sx / sw;
+  const cy = sy / sw;
+  const spread = Math.sqrt(Math.max(0, (sxx + syy) / sw - cx * cx - cy * cy));
+  return { x: cx, y: cy, n, peak, spread };
 }
 
 /**

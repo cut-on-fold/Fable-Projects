@@ -33,8 +33,8 @@ export interface Diagnostic {
   roi: { x: number; y: number; w: number; h: number };
   lit: Frame;
   ringed: Frame | null;
-  ring: { x: number; y: number; n: number } | null;
-  dot: { x: number; y: number; n: number; peak: number } | null;
+  ring: { x: number; y: number; n: number; drop: number; peak: number; spread: number } | null;
+  dot: { x: number; y: number; n: number; peak: number; spread: number } | null;
   /** The ring's expected place in the picture from the corners, within the roi. */
   guess: Pt;
   outcome: AutoOutcome;
@@ -52,13 +52,20 @@ export interface AutoOutcome {
 const ROI = 240; // camera px, square, around where the point is expected
 const DOT_REACH = 60; // camera px: how far from the ring to look for the dot
 const RING_PIXELS = 30; // darkened pixels that count as seeing the ring
+const RING_SPREAD = 40; // camera px: darkening further out than this on average is not a ring
+const DOT_SPREAD = 8; // camera px: orange further out than this on average is a line or a smear, not a dot
 const DONE_GAP = 0.5; // camera px
 const MAX_STEP = 60; // screen px per go, as a safety stop
+const MAX_TRAVEL = 120; // screen px from where the point started, in all
 const MAX_ROUNDS = 6;
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Set one point. */
+/**
+ * Set one point. Whatever goes wrong part way (the ring lost, the dot
+ * lost, the gap not closing, the point wandering), the point goes back to
+ * where it started, so a failed try never leaves the calibration worse.
+ */
 export async function autoPoint(host: AutoHost, i: number, j: number): Promise<AutoOutcome> {
   const h = host.homography();
   const size = host.pictureSize();
@@ -83,13 +90,14 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
   if (!lit) return { i, j, ok: false, gap: NaN, reason: 'no camera picture' };
   const guessInRoi = { x: guess.x - roi.x, y: guess.y - roi.y };
   const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, outcome: { i, j, ok: false, gap: NaN } };
+  let p = { ...start };
   const finish = (outcome: AutoOutcome): AutoOutcome => {
+    if (!outcome.ok && (p.x !== start.x || p.y !== start.y)) host.setPoint(i, j, start);
     diag.outcome = outcome;
     host.record?.(diag);
     return outcome;
   };
 
-  let p = { ...start };
   let gap = NaN;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (host.stopped()) return finish({ i, j, ok: false, gap, reason: 'stopped' });
@@ -98,24 +106,41 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     const ringed = await host.grab(roi);
     if (!ringed) return finish({ i, j, ok: false, gap, reason: 'no camera picture' });
     diag.ringed = ringed;
-    const ring = darkenedCentroid(lit, ringed, 40, 1);
+    const ring = darkenedCentroid(lit, ringed, RING_PIXELS);
     diag.ring = ring;
-    if (!ring || ring.n < RING_PIXELS) {
-      return finish({ i, j, ok: false, gap, reason: `the ring was not seen in the picture (${ring?.n ?? 0} pixels changed, ${RING_PIXELS} needed)` });
+    if (!ring) {
+      const seen = darkenedCentroid(lit, ringed, 1);
+      return finish({ i, j, ok: false, gap, reason: `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)` });
+    }
+    if (ring.spread > RING_SPREAD) {
+      return finish({ i, j, ok: false, gap, reason: `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)` });
     }
     const dot = dotNear(lit, ring, DOT_REACH);
     diag.dot = dot;
     if (!dot) return finish({ i, j, ok: false, gap, reason: `no dot near the ring (best orange score ${Math.round(dotNear(lit, ring, DOT_REACH, 0, 1)?.peak ?? 0)}, 40 needed)` });
+    if (dot.spread > DOT_SPREAD) {
+      return finish({ i, j, ok: false, gap, reason: `the orange near the ring is a line or a smear, not a dot (spread ${Math.round(dot.spread)} px, ${DOT_SPREAD} at most)` });
+    }
     const ringCam = { x: ring.x + roi.x, y: ring.y + roi.y };
     const dotCam = { x: dot.x + roi.x, y: dot.y + roi.y };
+    const was = gap;
     gap = Math.hypot(dotCam.x - ringCam.x, dotCam.y - ringCam.y);
     host.progress(`${gap.toFixed(1)} px off`);
     if (gap <= DONE_GAP) break;
+    // each go should take most of the gap away; if it is not closing, the dot found is not the one under the ring
+    if (round > 0 && gap > was * 0.7 + DONE_GAP) {
+      return finish({ i, j, ok: false, gap, reason: `the ring and the dot were not closing in (${was.toFixed(1)} px off, then ${gap.toFixed(1)})` });
+    }
     const step = correction(h, p, ringCam, dotCam);
     const len = Math.hypot(step.x, step.y);
     if (len === 0) return finish({ i, j, ok: false, gap, reason: 'the map gives no direction to move' });
     const k = len > MAX_STEP ? MAX_STEP / len : 1;
-    p = { x: p.x + step.x * k, y: p.y + step.y * k };
+    const next = { x: p.x + step.x * k, y: p.y + step.y * k };
+    const travel = Math.hypot(next.x - start.x, next.y - start.y);
+    if (travel > MAX_TRAVEL) {
+      return finish({ i, j, ok: false, gap, reason: `it would have moved ${Math.round(travel)} px on screen, more than the ${MAX_TRAVEL} trusted` });
+    }
+    p = next;
     host.setPoint(i, j, p);
   }
   await host.showRing(null);
