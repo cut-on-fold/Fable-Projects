@@ -183,6 +183,19 @@ async function run(name, { dark }) {
   if (!s.calibrations[0].camera || s.calibrations[0].camera.corners?.length !== 4 || s.calibrations[0].camera.zoom !== 2) errors.push(`${name}: camera setup stored ${JSON.stringify(s.calibrations[0].camera)}`);
   if (!/Following/.test(await page.textContent('#cam-status'))) errors.push(`${name}: camera status ${await page.textContent('#cam-status')}`);
   await page.screenshot({ path: join(SHOTS, `${name}-camera.png`) });
+  // Auto against the fake camera: there are no dots to find, so every point is left as it was and the
+  // summary says so; the tools come back afterwards.
+  s = await stored();
+  const beforeAuto = JSON.stringify(s.calibrations[0].mesh.points);
+  await page.click('#auto');
+  await page.waitForTimeout(300);
+  if (!(await page.isHidden('#bar'))) errors.push(`${name}: tools not hidden while Auto runs`);
+  await page.waitForFunction(() => /points set from the camera|Nothing was set/.test(document.getElementById('hint')?.textContent ?? ''), null, { timeout: 60000 }).catch(() => errors.push(`${name}: Auto did not finish`));
+  const summary = await page.textContent('#hint');
+  if (!/0 of 12 points set/.test(summary)) errors.push(`${name}: Auto summary: ${summary}`);
+  s = await stored();
+  if (JSON.stringify(s.calibrations[0].mesh.points) !== beforeAuto) errors.push(`${name}: Auto moved points with no dots to see`);
+  if (await page.isHidden('#bar')) errors.push(`${name}: tools not back after Auto`);
   await page.click('#cam-close');
   if (await page.$('#cam')) errors.push(`${name}: camera window did not close`);
 

@@ -8,7 +8,8 @@
 // the picture gives a rough map from the screen to the camera picture, and
 // that is only used to decide where to zoom; the eye does the aligning.
 
-import { applyHomography, homographyFromPoints, type Pt } from './calc/homography';
+import { applyHomography, homographyFromPoints, type Mat3, type Pt } from './calc/homography';
+import type { Frame } from './calc/vision';
 
 export interface CameraSetup {
   deviceId: string | null;
@@ -139,6 +140,57 @@ export class CameraPanel {
     });
     this.root = el('div', { class: 'cam', id: 'cam', role: 'dialog', 'aria-label': 'Camera' }, head, this.canvas, this.status);
     new ResizeObserver(() => this.draw()).observe(this.canvas);
+  }
+
+  /** Screen → camera picture, from the clicked corners; null until they are set. */
+  homography(): Mat3 | null {
+    const c = this.host.getSetup().corners;
+    return c ? homographyFromPoints(this.host.screenCorners(), c) : null;
+  }
+
+  /** The camera picture's size in its own pixels, once it is running. */
+  pictureSize(): { w: number; h: number } | null {
+    const w = this.video.videoWidth;
+    const h = this.video.videoHeight;
+    return w && h ? { w, h } : null;
+  }
+
+  private grabCanvas: HTMLCanvasElement | null = null;
+
+  /** A piece of the current camera picture, at the camera's own resolution. */
+  grab(roi: { x: number; y: number; w: number; h: number }): Frame | null {
+    const size = this.pictureSize();
+    if (!size || roi.w <= 0 || roi.h <= 0) return null;
+    this.grabCanvas ??= document.createElement('canvas');
+    const c = this.grabCanvas;
+    if (c.width !== roi.w || c.height !== roi.h) {
+      c.width = roi.w;
+      c.height = roi.h;
+    }
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(this.video, roi.x, roi.y, roi.w, roi.h, 0, 0, roi.w, roi.h);
+    const img = ctx.getImageData(0, 0, roi.w, roi.h);
+    return { width: img.width, height: img.height, data: img.data };
+  }
+
+  /** Hide the window (the camera keeps running) while the table has to be clear, and bring it back. */
+  setHidden(hidden: boolean): void {
+    this.root.style.visibility = hidden ? 'hidden' : '';
+  }
+
+  /** If the window covers a screen point that matters, move it to the corner of the screen furthest from it. */
+  avoid(p: Pt, margin = 60): void {
+    const r = this.root.getBoundingClientRect();
+    if (p.x < r.left - margin || p.x > r.right + margin || p.y < r.top - margin || p.y > r.bottom + margin) return;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const left = p.x > W / 2;
+    const top = p.y > H / 2;
+    this.root.style.left = left ? '12px' : `${Math.max(0, W - r.width - 12)}px`;
+    this.root.style.top = top ? '12px' : `${Math.max(0, H - r.height - 12)}px`;
+    this.root.style.right = 'auto';
+    this.root.style.bottom = 'auto';
   }
 
   private say(text: string, warn = false): void {

@@ -8,6 +8,7 @@ import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement
 import { openFile, type Opened } from './document';
 import { card } from '../../calibration/card.mjs';
 import { CameraPanel, defaultCameraSetup, parseCameraSetup, type CameraSetup } from './camera';
+import { autoCalibrate, summarise, type AutoHost } from './autocal';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
 
@@ -127,6 +128,7 @@ function setMesh(m: Mesh, touched = true): void {
   const c = cal();
   c.mesh = m;
   if (touched) c.screen = screenInfo();
+  if (touched && !autoRun) autoSummary = null;
   meshDirty = true;
   save();
   redraw();
@@ -142,6 +144,11 @@ let renderToken = 0;
 // Calibration interaction
 let selected: { i: number; j: number } | null = { i: 0, j: 0 };
 let cameraPanel: CameraPanel | null = null;
+// Automatic calibration in progress: the ring being projected, the words for the corner of the screen, and the stop flag.
+let autoRun: { stop: boolean } | null = null;
+let autoRing: Pt | null = null;
+let autoText = '';
+let autoSummary: string | null = null;
 let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number } | { kind: 'pattern'; last: Pt } | null = null;
 let meshDirty = true;
 
@@ -295,6 +302,7 @@ function buildBar(): void {
       'div',
       { class: 'group' },
       btn('Camera', { id: 'camera', 'aria-pressed': String(!!cameraPanel), title: 'A webcam over the table, zoomed in on the selected point, so you can calibrate sitting down', onclick: toggleCamera }),
+      btn('Auto', { id: 'auto', disabled: !cameraPanel?.homography(), title: 'Set every point from the camera: a ring is projected at each and moved until it is centred on the painted dot. Needs the camera open with its corners found, orange dots on the mat crossings, and the room not too bright.', onclick: () => void runAuto(allPoints()) }, 'A'),
       btn('Invert', { id: 'invert', 'aria-pressed': String(state.invert), onclick: () => toggle('invert') }, 'I'),
       btn('Full screen', { id: 'fullscreen', onclick: toggleFullscreen }),
       btn('Hide tools', { id: 'hide', onclick: () => setBarHidden(true) }, 'H'),
@@ -365,7 +373,9 @@ function refreshHint(): void {
   const now = screenInfo();
   const moved = info && (info.w !== now.w || info.h !== now.h || Math.abs(info.dpr - now.dpr) > 0.01 || info.full !== now.full);
   hint.classList.toggle('warn', !!(folded.length || moved));
-  if (folded.length) {
+  if (autoSummary) {
+    hint.textContent = autoSummary;
+  } else if (folded.length) {
     hint.textContent = `A point has been dragged past its neighbour, so the picture would fold there. Move it back.`;
   } else if (moved) {
     hint.textContent = `This table was calibrated in a ${info!.w} × ${info!.h} ${info!.full ? 'full-screen ' : ''}window; this one is ${now.w} × ${now.h}${now.full ? ' full screen' : ''}. Go full screen the same way, or calibrate again.`;
@@ -445,6 +455,8 @@ function renderPop(): void {
       ),
       el('h2', { text: 'Calibrating from a chair' }),
       el('p', { text: 'Camera opens a webcam over the table (an iPhone on a mount works as a Mac webcam) in a small window. Press Find corners and click each of the four corner crosses in the picture, roughly first and then close up once the window has zoomed in; after that the window zooms in on whichever point is selected, so you can nudge it with the arrow keys and move on with [ and ] while watching the mat on screen. The camera needs the page served over https or from localhost. With an iPhone, the Mac decides how much of the table the picture shows: while the camera is open, click the green camera icon in the menu bar and set the zoom there to 0.5×, the wide lens. The Mac remembers it for the browser, and sometimes forgets.' }),
+      el('h2', { text: 'Setting the points from the camera' }),
+      el('p', { text: 'With orange dots painted on the mat crossings and the camera open with its corners found, Auto (or A for the selected point, Shift+A for all) sets the points itself: the screen goes white, a small black ring is projected at each point, and the point is moved until the ring is centred on the dot, to about half a millimetre. The tools and the camera window hide while it runs; Esc stops it. A dot it cannot see, under the laptop say, is left where it was and listed at the end. It works best with the room lights down, so the projector is the brightest thing the camera sees.' }),
       el('h2', { text: 'Calibrating with a tape' }),
       el('p', { text: 'No gridded mat, as on a floor? Mark a rectangle of the size in the boxes with tape, drag the corners onto it, then lay a tape measure along each grid line: every point is labelled with its distance from the top-left corner.' }),
       el('p', {}, 'Each table keeps its own calibration; the window size it was made in is remembered, so calibrate in full screen and project in full screen. Lantern ', `v${__LANTERN_VERSION__}`, '.'),
@@ -466,6 +478,7 @@ function toggleCamera(): void {
     setSetup: (c) => {
       cal().camera = c;
       save();
+      refreshAutoButton();
     },
     screenCorners: () => corners(mesh()),
     selected: () => {
@@ -477,6 +490,7 @@ function toggleCamera(): void {
     onClose: () => {
       cameraPanel = null;
       document.getElementById('camera')?.setAttribute('aria-pressed', 'false');
+      refreshAutoButton();
     },
   });
   cameraPanel = panel;
@@ -485,7 +499,79 @@ function toggleCamera(): void {
   void panel.start();
 }
 
+/** Auto can run once the camera is open and its corners have been found. */
+function refreshAutoButton(): void {
+  const b = document.getElementById('auto') as HTMLButtonElement | null;
+  if (b) b.disabled = !cameraPanel?.homography();
+}
+
+/** Every calibration point, corners first, then row by row. */
+function allPoints(): Array<{ i: number; j: number }> {
+  const m = mesh();
+  const c = cols(m);
+  const r = rows(m);
+  const out: Array<{ i: number; j: number }> = [
+    { i: 0, j: 0 },
+    { i: c, j: 0 },
+    { i: c, j: r },
+    { i: 0, j: r },
+  ];
+  for (let j = 0; j <= r; j++) for (let i = 0; i <= c; i++) if (!((i === 0 || i === c) && (j === 0 || j === r))) out.push({ i, j });
+  return out;
+}
+
+/** Set points from the camera: the table is cleared of everything but a ring, the window and tools hidden meanwhile. */
+async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
+  if (autoRun || !cameraPanel || state.mode !== 'calibrate') return;
+  const panel = cameraPanel;
+  if (!panel.homography()) {
+    showToast('Find the corners in the camera window first.');
+    return;
+  }
+  const run = { stop: false };
+  autoRun = run;
+  autoSummary = null;
+  const barWasHidden = state.barHidden;
+  setBarHidden(true);
+  panel.setHidden(true);
+  const label = (i: number, j: number) => coords(tablePointAt(mesh(), i, j));
+  const host: AutoHost = {
+    homography: () => panel.homography(),
+    pictureSize: () => panel.pictureSize(),
+    grab: (roi) => panel.grab(roi),
+    showRing: async (p) => {
+      autoRing = p;
+      redraw();
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    },
+    getPoint: (i, j) => pointAt(mesh(), i, j),
+    setPoint: (i, j, p) => setMesh(withPoint(mesh(), i, j, p)),
+    settleMs: 450,
+    progress: (text) => {
+      autoText = text;
+      redraw();
+    },
+    stopped: () => run.stop,
+  };
+  let outcomes: Awaited<ReturnType<typeof autoCalibrate>> = [];
+  try {
+    outcomes = await autoCalibrate(host, points, label);
+  } catch (e) {
+    showToast(`Automatic calibration stopped: ${(e as Error).message}`);
+  } finally {
+    autoRun = null;
+    autoRing = null;
+    autoText = '';
+    panel.setHidden(false);
+    setBarHidden(barWasHidden);
+    autoSummary = (run.stop ? 'Stopped. ' : '') + summarise(outcomes, label);
+    buildBar();
+    redraw();
+  }
+}
+
 function setMode(mode: State['mode']): void {
+  if (autoRun) autoRun.stop = true;
   if (mode !== 'calibrate') cameraPanel?.close();
   state.mode = mode;
   popOpen = null;
@@ -657,6 +743,7 @@ function draw(): void {
   const dpr = window.devicePixelRatio || 1;
   const m = mesh();
   stage.classList.toggle('inverted', state.invert);
+  stage.classList.toggle('auto', !!autoRun);
   stage.classList.toggle('mode-calibrate', state.mode === 'calibrate');
   stage.classList.toggle('mode-project', state.mode === 'project');
 
@@ -681,6 +768,25 @@ function draw(): void {
   const ctx = overlayCtx;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  if (autoRun) {
+    // A white table with nothing on it but the ring at the point being set, and a word of progress in the
+    // corner of the screen furthest from it, where it cannot get into the camera's picture of the ring.
+    if (autoRing) {
+      ctx.beginPath();
+      ctx.arc(autoRing.x, autoRing.y, 32, 0, Math.PI * 2);
+      ctx.arc(autoRing.x, autoRing.y, 24, 0, Math.PI * 2, true);
+      ctx.fillStyle = '#000';
+      ctx.fill('evenodd');
+    }
+    const far = { x: (autoRing?.x ?? W / 2) > W / 2 ? 16 : W - 16, y: (autoRing?.y ?? H / 2) > H / 2 ? 24 : H - 16 };
+    ctx.font = '14px Atkinson Hyperlegible, sans-serif';
+    ctx.textAlign = far.x > W / 2 ? 'right' : 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#9a9a9a';
+    ctx.fillText(`Setting from the camera: ${autoText}. Esc stops.`, far.x, far.y);
+    ctx.textAlign = 'left';
+    return;
+  }
   const ink = state.invert ? '#e8eaec' : '#22272b';
   const accent = state.invert ? '#8fc3dd' : '#2f6f8f';
   const chalk = state.invert ? '#ffd166' : '#b8471f';
@@ -800,6 +906,8 @@ function draw(): void {
       }
     }
     ctx.textAlign = 'left';
+    // the camera window keeps out of the way of the point being worked on
+    if (cameraPanel && selected && selected.i <= cols(m) && selected.j <= rows(m)) cameraPanel.avoid(pointAt(m, selected.i, selected.j));
   }
 
   if (state.mode === 'project' && state.showOutline && doc && pageSize && state.placement) {
@@ -904,8 +1012,12 @@ window.addEventListener('keydown', (e) => {
       setBarHidden(!state.barHidden);
       break;
     case 'escape':
-      if (popOpen) togglePop(popOpen);
+      if (autoRun) autoRun.stop = true;
+      else if (popOpen) togglePop(popOpen);
       else setBarHidden(false);
+      break;
+    case 'a':
+      if (state.mode === 'calibrate' && selected && cameraPanel) void runAuto(e.shiftKey ? allPoints() : [selected]);
       break;
     case 'c':
       setMode('calibrate');
