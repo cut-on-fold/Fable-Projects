@@ -6,7 +6,18 @@
 
 import type { Mat3, Pt } from './calc/homography';
 import { applyHomography } from './calc/homography';
-import { correction, darkenedCentroid, dotNear, type Frame } from './calc/vision';
+import { correction, darkenedCentroid, dotNear, localScale, type Frame } from './calc/vision';
+
+/** The ring as drawn on the white screen: a black annulus between these radii, in screen pixels. */
+export const RING_INNER = 22;
+export const RING_OUTER = 34;
+/** Where the darkening of the ring sits on average: the area-weighted mean radius of the annulus. */
+export const RING_MEAN = ((2 / 3) * (RING_OUTER ** 3 - RING_INNER ** 3)) / (RING_OUTER ** 2 - RING_INNER ** 2);
+
+/** What one run learns as it goes: the ring's apparent radius per unit of camera scale, from rings seen whole. */
+export interface AutoMemory {
+  ringScales: number[];
+}
 
 export interface AutoHost {
   /** Screen → camera picture, from the clicked corners. */
@@ -33,7 +44,7 @@ export interface Diagnostic {
   roi: { x: number; y: number; w: number; h: number };
   lit: Frame;
   ringed: Frame | null;
-  ring: { x: number; y: number; n: number; drop: number; peak: number; spread: number; radius: number | null } | null;
+  ring: { x: number; y: number; n: number; drop: number; peak: number; spread: number; radius: number | null; coverage: number } | null;
   dot: { x: number; y: number; n: number; peak: number; spread: number } | null;
   /** The ring's expected place in the picture from the corners, within the roi. */
   guess: Pt;
@@ -68,7 +79,7 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * lost, the gap not closing, the point wandering), the point goes back to
  * where it started, so a failed try never leaves the calibration worse.
  */
-export async function autoPoint(host: AutoHost, i: number, j: number): Promise<AutoOutcome> {
+export async function autoPoint(host: AutoHost, i: number, j: number, memory: AutoMemory = { ringScales: [] }): Promise<AutoOutcome> {
   const h = host.homography();
   const size = host.pictureSize();
   if (!h || !size) return { i, j, ok: false, gap: NaN, reason: 'the corners have not been found in the picture' };
@@ -112,8 +123,12 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     if (!ringed) return finish({ i, j, ok: false, gap, reason: 'no camera picture' });
     diag.ringed = ringed;
     const near = { ...expected, r: RING_REACH };
-    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near);
+    // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
+    const scale = localScale(h, p);
+    const expectRadius = scale * median(memory.ringScales, RING_MEAN);
+    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
     diag.ring = ring;
+    if (ring?.radius && ring.coverage >= 0.9 && scale > 0) memory.ringScales.push(ring.radius / scale);
     if (!ring) {
       const seen = darkenedCentroid(lit, ringed, 1, 10, near);
       return finish({ i, j, ok: false, gap, reason: `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)` });
@@ -158,14 +173,23 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
   return finish({ i, j, ok: gap <= 1.5, gap, reason: gap <= 1.5 ? undefined : 'did not settle' });
 }
 
+/** The middle value, or `fallback` with nothing to take it from. */
+function median(values: number[], fallback: number): number {
+  if (!values.length) return fallback;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
 /** Set every point given, in order, and say how it went. */
 export async function autoCalibrate(host: AutoHost, points: Array<{ i: number; j: number }>, label: (i: number, j: number) => string): Promise<AutoOutcome[]> {
   const outcomes: AutoOutcome[] = [];
+  const memory: AutoMemory = { ringScales: [] };
   for (let n = 0; n < points.length; n++) {
     if (host.stopped()) break;
     const { i, j } = points[n]!;
     host.progress(`${label(i, j)} (${n + 1} of ${points.length})`);
-    outcomes.push(await autoPoint(host, i, j));
+    outcomes.push(await autoPoint(host, i, j, memory));
   }
   await host.showRing(null);
   return outcomes;

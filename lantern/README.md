@@ -99,7 +99,9 @@ it looks only around where the ring should be and only on the lit mat,
 since dark things in the picture (a laptop, the floor) flicker from frame
 to frame; and it fits a circle to what it sees, so a corner or edge point
 whose ring is cut off by the screen's edge still gets the ring's true
-centre. The dot is found by hue: orange paint, orange vinyl and a
+centre (with less than three quarters of the ring showing, the radius is
+held at what it must be, from how the ring is drawn and the camera's
+scale there, and only the centre is fitted). The dot is found by hue: orange paint, orange vinyl and a
 red-orange dot count, red and pink mat lines, yellow and brown do not;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.

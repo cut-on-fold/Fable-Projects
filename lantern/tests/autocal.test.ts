@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyHomography, homographyFromPoints, invert, rectCorners, type Mat3, type Pt } from '../src/calc/homography';
-import { blankFrame, paintDisc, type Frame } from '../src/calc/vision';
-import { autoCalibrate, autoPoint, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
+import { blankFrame, localScale, paintDisc, type Frame } from '../src/calc/vision';
+import { autoCalibrate, autoPoint, RING_INNER, RING_OUTER, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
 
 // A pretend table seen by a pretend camera: a white mat with reddish lines through every dot, orange dots,
 // and a projector that dims a ring where it is told to. The camera's map of the screen is a little wrong,
@@ -9,8 +9,7 @@ import { autoCalibrate, autoPoint, summarise, type AutoHost, type AutoOutcome } 
 
 const W = 1920;
 const H = 1080;
-const PIC = { w: 960, h: 720 };
-const SCALE = 0.375; // picture px per screen px, near enough
+const PIC = { w: 960, h: 720 }; // about 0.375 picture px per screen px
 const ORANGE: [number, number, number] = [232, 140, 58];
 const RED_LINE: [number, number, number] = [235, 135, 115];
 
@@ -71,8 +70,10 @@ function picture(table: Table, ring: Pt | null, seed: number): Frame {
   }
   if (ring) {
     const c = applyHomography(real, ring);
-    const outer = 34 * SCALE;
-    const inner = 22 * SCALE;
+    // the ring is as big in the picture as the camera's scale makes it where it lands, as a projected one is
+    const scale = localScale(real, ring);
+    const outer = RING_OUTER * scale;
+    const inner = RING_INNER * scale;
     for (let y = Math.floor(c.y - outer); y <= Math.ceil(c.y + outer); y++) {
       for (let x = Math.floor(c.x - outer); x <= Math.ceil(c.x + outer); x++) {
         if (x < 0 || y < 0 || x >= PIC.w || y >= PIC.h) continue;

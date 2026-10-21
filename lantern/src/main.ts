@@ -8,7 +8,7 @@ import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement
 import { openFile, type Opened } from './document';
 import { card } from '../../calibration/card.mjs';
 import { CameraPanel, defaultCameraSetup, parseCameraSetup, type CameraSetup } from './camera';
-import { autoCalibrate, summarise, type AutoHost, type Diagnostic } from './autocal';
+import { autoCalibrate, RING_INNER, RING_OUTER, summarise, type AutoHost, type Diagnostic } from './autocal';
 import { orangeScore } from './calc/vision';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
@@ -649,7 +649,7 @@ function saveDiagnostics(): void {
     ctx.font = '11px Atkinson Hyperlegible, sans-serif';
     ctx.fillText('plain (blue ring: where expected)', 10, top + cell + 12);
     ctx.fillText('with the ring', 20 + cell, top + cell + 12);
-    ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px by over ${Math.round(d.ring.drop)} (most ${Math.round(d.ring.peak)}), spread ${Math.round(d.ring.spread)}, circle ${d.ring.radius ? `r ${d.ring.radius.toFixed(1)}` : 'not fitted'}` : 'none'}`, 30 + cell * 2, top + cell + 12);
+    ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px by over ${Math.round(d.ring.drop)} (most ${Math.round(d.ring.peak)}), spread ${Math.round(d.ring.spread)}, circle ${d.ring.radius ? `r ${d.ring.radius.toFixed(1)}, ${Math.round(d.ring.coverage * 100)}% of it` : 'not fitted'}` : 'none'}`, 30 + cell * 2, top + cell + 12);
     ctx.fillText(`orange score: ${d.dot ? `${d.dot.n} px, peak ${Math.round(d.dot.peak)}, spread ${d.dot.spread.toFixed(1)}` : 'nothing'}`, 40 + cell * 3, top + cell + 12);
   });
   c.toBlob((blob) => {
@@ -866,8 +866,8 @@ function draw(): void {
     // corner of the screen furthest from it, where it cannot get into the camera's picture of the ring.
     if (autoRing) {
       ctx.beginPath();
-      ctx.arc(autoRing.x, autoRing.y, 34, 0, Math.PI * 2);
-      ctx.arc(autoRing.x, autoRing.y, 22, 0, Math.PI * 2, true);
+      ctx.arc(autoRing.x, autoRing.y, RING_OUTER, 0, Math.PI * 2);
+      ctx.arc(autoRing.x, autoRing.y, RING_INNER, 0, Math.PI * 2, true);
       ctx.fillStyle = '#000';
       ctx.fill('evenodd');
     }
