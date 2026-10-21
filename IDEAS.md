@@ -71,6 +71,14 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.2** — Auto sees a ring that is only a shade darker
+      than the mat (the threshold comes from the picture, not a fixed
+      contrast), no longer takes a red mat line for the dot (red with no
+      green over blue scores nothing, and anything but a small compact patch
+      is refused), gives up when the ring and dot stop closing in or the
+      point would travel too far, and puts a point it could not set back
+      exactly where it was. The whole loop is tested against a pretend
+      table and camera.
 - [x] **Lantern v0.4.1** — Auto finds a small, blurred dot by how orange
       each pixel is rather than a hard yes or no; waits for a fresh camera
       frame before looking; says in the summary what it saw (pixels changed,

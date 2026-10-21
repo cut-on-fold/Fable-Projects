@@ -632,7 +632,7 @@ function saveDiagnostics(): void {
       const b = d.ringed?.data;
       const before = 0.299 * a[i]! + 0.587 * a[i + 1]! + 0.114 * a[i + 2]!;
       const after = b ? 0.299 * b[i]! + 0.587 * b[i + 1]! + 0.114 * b[i + 2]! : before;
-      const v = before - after > 40 ? 0 : 255;
+      const v = before - after > (d.ring?.drop ?? 10) ? 0 : 255;
       dark.data[i] = dark.data[i + 1] = dark.data[i + 2] = v;
       dark.data[i + 3] = 255;
       const sc = Math.min(255, orangeScore(a[i]!, a[i + 1]!, a[i + 2]!) * 1.5);
@@ -649,8 +649,8 @@ function saveDiagnostics(): void {
     ctx.font = '11px Atkinson Hyperlegible, sans-serif';
     ctx.fillText('plain (blue ring: where expected)', 10, top + cell + 12);
     ctx.fillText('with the ring', 20 + cell, top + cell + 12);
-    ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px` : 'none'}`, 30 + cell * 2, top + cell + 12);
-    ctx.fillText(`orange score: ${d.dot ? `${d.dot.n} px, peak ${Math.round(d.dot.peak)}` : 'nothing'}`, 40 + cell * 3, top + cell + 12);
+    ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px by over ${Math.round(d.ring.drop)} (most ${Math.round(d.ring.peak)}), spread ${Math.round(d.ring.spread)}` : 'none'}`, 30 + cell * 2, top + cell + 12);
+    ctx.fillText(`orange score: ${d.dot ? `${d.dot.n} px, peak ${Math.round(d.dot.peak)}, spread ${d.dot.spread.toFixed(1)}` : 'nothing'}`, 40 + cell * 3, top + cell + 12);
   });
   c.toBlob((blob) => {
     if (!blob) return;
@@ -866,8 +866,8 @@ function draw(): void {
     // corner of the screen furthest from it, where it cannot get into the camera's picture of the ring.
     if (autoRing) {
       ctx.beginPath();
-      ctx.arc(autoRing.x, autoRing.y, 32, 0, Math.PI * 2);
-      ctx.arc(autoRing.x, autoRing.y, 24, 0, Math.PI * 2, true);
+      ctx.arc(autoRing.x, autoRing.y, 34, 0, Math.PI * 2);
+      ctx.arc(autoRing.x, autoRing.y, 22, 0, Math.PI * 2, true);
       ctx.fillStyle = '#000';
       ctx.fill('evenodd');
     }
