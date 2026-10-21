@@ -21,19 +21,23 @@ function set(f: Frame, x: number, y: number, rgb: [number, number, number]): voi
   f.data[i + 1] = rgb[1];
   f.data[i + 2] = rgb[2];
 }
-/** Make a ring darker the way a projected black ring does: everything under it keeps its colour but dims. */
-function dim(f: Frame, cx: number, cy: number, radius: number, hole: number, factor: number): void {
+/**
+ * Make a ring darker the way a projected black ring does: everything under it keeps its colour but dims.
+ * With `clip`, only below and to the right of it, as the screen's edge cuts a ring off.
+ */
+function dim(f: Frame, cx: number, cy: number, radius: number, hole: number, factor: number, clip?: { x?: number; y?: number }): void {
   for (let y = 0; y < f.height; y++) {
     for (let x = 0; x < f.width; x++) {
       const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
       if (d > radius || d < hole) continue;
+      if (clip && (x + 0.5 < (clip.x ?? -Infinity) || y + 0.5 < (clip.y ?? -Infinity))) continue;
       const i = (y * f.width + x) * 4;
       for (let c = 0; c < 3; c++) f.data[i + c] = Math.round(f.data[i + c]! * factor);
     }
   }
 }
 const ORANGE: [number, number, number] = [232, 140, 58];
-const RED_LINE: [number, number, number] = [230, 150, 110];
+const RED_LINE: [number, number, number] = [235, 135, 115];
 
 describe('luma', () => {
   it('is brightness', () => {
@@ -53,6 +57,24 @@ describe('darkenedCentroid', () => {
     expect(Math.abs(c.y - 77.6)).toBeLessThan(0.3);
     expect(c.spread).toBeGreaterThan(9);
     expect(c.spread).toBeLessThan(14);
+    expect(c.radius).toBeGreaterThan(10);
+    expect(c.radius).toBeLessThan(13);
+  });
+  it('finds the centre of a ring cut off by the edge of the screen, from the half or the quarter that shows', () => {
+    const lit = mat();
+    const half = mat();
+    dim(half, 101.3, 77.6, 14, 9, 0.5, { y: 77.6 }); // only the bottom half is projected
+    const c = darkenedCentroid(lit, half, 30, 10, { x: 101, y: 84, r: 50 })!;
+    expect(c).not.toBeNull();
+    expect(c.radius).not.toBeNull();
+    expect(Math.abs(c.x - 101.3)).toBeLessThan(0.5);
+    expect(Math.abs(c.y - 77.6)).toBeLessThan(0.5);
+    const quarter = mat();
+    dim(quarter, 101.3, 77.6, 14, 9, 0.5, { x: 101.3, y: 77.6 });
+    const q = darkenedCentroid(lit, quarter, 30, 10, { x: 108, y: 84, r: 50 })!;
+    expect(q).not.toBeNull();
+    expect(Math.abs(q.x - 101.3)).toBeLessThan(0.7);
+    expect(Math.abs(q.y - 77.6)).toBeLessThan(0.7);
   });
   it('sees a ring that is only a shade darker than the mat, as a projected black is in a lit room', () => {
     const lit = mat();
@@ -134,6 +156,12 @@ describe('orangeScore and dotNear', () => {
     expect(orangeScore(120, 120, 125)).toBe(0); // pencil
     expect(orangeScore(230, 120, 110)).toBe(0); // a red mat line: red over blue, but green no higher than blue
     expect(orangeScore(...RED_LINE)).toBeLessThan(orangeScore(...ORANGE) / 2); // a reddish-orange line scores, but well under the paint
+    expect(orangeScore(250, 115, 70)).toBeGreaterThan(100); // a red-orange dot
+    expect(orangeScore(239, 98, 45)).toBeGreaterThan(100); // orange vinyl
+    expect(orangeScore(230, 169, 20)).toBe(0); // a golden yellow
+    expect(orangeScore(235, 225, 60)).toBe(0); // a yellow ruler
+    expect(orangeScore(120, 80, 40)).toBe(0); // the brown edge of a wooden table
+    expect(orangeScore(60, 30, 10)).toBe(0); // orange in shadow: too dark to trust
   });
   it('finds the dot on a crossing of red lines, not the lines', () => {
     const f = mat();

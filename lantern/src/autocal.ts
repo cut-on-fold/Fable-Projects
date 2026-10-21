@@ -33,7 +33,7 @@ export interface Diagnostic {
   roi: { x: number; y: number; w: number; h: number };
   lit: Frame;
   ringed: Frame | null;
-  ring: { x: number; y: number; n: number; drop: number; peak: number; spread: number } | null;
+  ring: { x: number; y: number; n: number; drop: number; peak: number; spread: number; radius: number | null } | null;
   dot: { x: number; y: number; n: number; peak: number; spread: number } | null;
   /** The ring's expected place in the picture from the corners, within the roi. */
   guess: Pt;
@@ -55,6 +55,7 @@ const RING_PIXELS = 30; // darkened pixels that count as seeing the ring
 const RING_REACH = 90; // camera px: how far from where the ring should be to look for it
 const RING_SPREAD = 60; // camera px: darkening further out than this on average is not a ring
 const DOT_SPREAD = 8; // camera px: orange further out than this on average is a line or a smear, not a dot
+const DOT_SCORE = 25; // the least orange score a pixel needs to be part of the dot (a small dot at the picture's edge is pale)
 const DONE_GAP = 0.5; // camera px
 const MAX_STEP = 60; // screen px per go, as a safety stop
 const MAX_TRAVEL = 120; // screen px from where the point started, in all
@@ -102,6 +103,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
   let gap = NaN;
   // where the ring should land: first where the corners say, then on the dot it was sent towards
   let expected = guessInRoi;
+  let stalls = 0;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (host.stopped()) return finish({ i, j, ok: false, gap, reason: 'stopped' });
     await host.showRing(p);
@@ -119,9 +121,9 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     if (ring.spread > RING_SPREAD) {
       return finish({ i, j, ok: false, gap, reason: `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)` });
     }
-    const dot = dotNear(lit, ring, DOT_REACH);
+    const dot = dotNear(lit, ring, DOT_REACH, DOT_SCORE);
     diag.dot = dot;
-    if (!dot) return finish({ i, j, ok: false, gap, reason: `no dot near the ring (best orange score ${Math.round(dotNear(lit, ring, DOT_REACH, 0, 1)?.peak ?? 0)}, 40 needed)` });
+    if (!dot) return finish({ i, j, ok: false, gap, reason: `no dot near the ring (best orange score ${Math.round(dotNear(lit, ring, DOT_REACH, 0, 1)?.peak ?? 0)}, ${DOT_SCORE} needed)` });
     if (dot.spread > DOT_SPREAD) {
       return finish({ i, j, ok: false, gap, reason: `the orange near the ring is a line or a smear, not a dot (spread ${Math.round(dot.spread)} px, ${DOT_SPREAD} at most)` });
     }
@@ -132,10 +134,13 @@ export async function autoPoint(host: AutoHost, i: number, j: number): Promise<A
     gap = Math.hypot(dotCam.x - ringCam.x, dotCam.y - ringCam.y);
     host.progress(`${gap.toFixed(1)} px off`);
     if (gap <= DONE_GAP) break;
-    // each go should take most of the gap away; if it is not closing, the dot found is not the one under the ring
+    // each go should take most of the gap away; two goes running that do not close it mean the dot found is not
+    // the one under the ring (one go can be noise, a ring cut off by the screen's edge being seen less surely)
     if (round > 0 && gap > was * 0.7 + DONE_GAP) {
-      return finish({ i, j, ok: false, gap, reason: `the ring and the dot were not closing in (${was.toFixed(1)} px off, then ${gap.toFixed(1)})` });
-    }
+      if (++stalls >= 2) {
+        return finish({ i, j, ok: false, gap, reason: `the ring and the dot were not closing in (${was.toFixed(1)} px off, then ${gap.toFixed(1)})` });
+      }
+    } else stalls = 0;
     const step = correction(h, p, ringCam, dotCam);
     const len = Math.hypot(step.x, step.y);
     if (len === 0) return finish({ i, j, ok: false, gap, reason: 'the map gives no direction to move' });

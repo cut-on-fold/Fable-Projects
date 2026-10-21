@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyHomography, homographyFromPoints, rectCorners, type Mat3, type Pt } from '../src/calc/homography';
+import { applyHomography, homographyFromPoints, invert, rectCorners, type Mat3, type Pt } from '../src/calc/homography';
 import { blankFrame, paintDisc, type Frame } from '../src/calc/vision';
 import { autoCalibrate, autoPoint, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
 
@@ -9,14 +9,15 @@ import { autoCalibrate, autoPoint, summarise, type AutoHost, type AutoOutcome } 
 
 const W = 1920;
 const H = 1080;
-const PIC = { w: 640, h: 480 };
+const PIC = { w: 960, h: 720 };
+const SCALE = 0.375; // picture px per screen px, near enough
 const ORANGE: [number, number, number] = [232, 140, 58];
-const RED_LINE: [number, number, number] = [230, 150, 110];
+const RED_LINE: [number, number, number] = [235, 135, 115];
 
 /** What the corners say: screen → picture. */
-const clicked = homographyFromPoints(rectCorners(W, H), [{ x: 80, y: 60 }, { x: 560, y: 70 }, { x: 550, y: 420 }, { x: 90, y: 410 }])!;
+const clicked = homographyFromPoints(rectCorners(W, H), [{ x: 120, y: 90 }, { x: 840, y: 105 }, { x: 825, y: 630 }, { x: 135, y: 615 }])!;
 /** Where the projector's light really lands in the picture: a few pixels off the clicked map. */
-const real = homographyFromPoints(rectCorners(W, H), [{ x: 84, y: 57 }, { x: 556, y: 73 }, { x: 553, y: 416 }, { x: 87, y: 413 }])!;
+const real = homographyFromPoints(rectCorners(W, H), [{ x: 126, y: 86 }, { x: 834, y: 110 }, { x: 830, y: 624 }, { x: 130, y: 620 }])!;
 
 interface Table {
   /** Dots on the mat, in picture pixels, by point. */
@@ -27,6 +28,23 @@ interface Table {
   black: number;
   /** Dark things in the picture (a laptop, the floor past the mat's edge), which flicker from frame to frame. */
   dark?: Array<{ x: number; y: number; w: number; h: number }>;
+  /** Which picture pixels the projector lights (inside the screen), worked out once. */
+  screen?: Uint8Array;
+}
+
+/** Whether each picture pixel is inside the projected screen; beyond it the mat is only in room light and no ring shows. */
+function litByProjector(table: Table): Uint8Array {
+  if (table.screen) return table.screen;
+  const inv = invert(real)!;
+  const mask = new Uint8Array(PIC.w * PIC.h);
+  for (let y = 0; y < PIC.h; y++) {
+    for (let x = 0; x < PIC.w; x++) {
+      const s = applyHomography(inv, { x: x + 0.5, y: y + 0.5 });
+      mask[y * PIC.w + x] = s.x >= 0 && s.x <= W && s.y >= 0 && s.y <= H ? 1 : 0;
+    }
+  }
+  table.screen = mask;
+  return mask;
 }
 
 function key(i: number, j: number): string {
@@ -45,15 +63,20 @@ function picture(table: Table, ring: Pt | null, seed: number): Frame {
   };
   for (const x of table.lines.xs) for (let y = 0; y < PIC.h; y++) paint(Math.round(x), y, RED_LINE);
   for (const y of table.lines.ys) for (let x = 0; x < PIC.w; x++) paint(x, Math.round(y), RED_LINE);
-  for (const d of table.dots.values()) paintDisc(f, d.x, d.y, 1.6, ORANGE);
+  for (const d of table.dots.values()) paintDisc(f, d.x, d.y, 2.4, ORANGE);
+  const lit = litByProjector(table);
+  for (let k = 0; k < PIC.w * PIC.h; k++) {
+    if (lit[k]) continue;
+    for (let c = 0; c < 3; c++) f.data[k * 4 + c] = Math.round(f.data[k * 4 + c]! * 0.45);
+  }
   if (ring) {
     const c = applyHomography(real, ring);
-    const scale = 0.25; // picture px per screen px, near enough
-    const outer = 34 * scale;
-    const inner = 22 * scale;
+    const outer = 34 * SCALE;
+    const inner = 22 * SCALE;
     for (let y = Math.floor(c.y - outer); y <= Math.ceil(c.y + outer); y++) {
       for (let x = Math.floor(c.x - outer); x <= Math.ceil(c.x + outer); x++) {
         if (x < 0 || y < 0 || x >= PIC.w || y >= PIC.h) continue;
+        if (!lit[y * PIC.w + x]) continue; // the screen ends here
         const d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y);
         if (d > outer || d < inner) continue;
         const i = (y * PIC.w + x) * 4;
@@ -167,6 +190,23 @@ describe('autoPoint', () => {
     expect((await autoPoint(f.host, 0, 0)).ok).toBe(true);
     expect((await autoPoint(f.host, 1, 2)).ok).toBe(true);
   });
+  it('sets a point on the edge of the screen and one in its corner, where the ring is cut off', async () => {
+    const { table, points } = grid({ x: 30, y: -10 });
+    const edge = { x: 900, y: 0 };
+    const corner = { x: 0, y: 0 };
+    table.dots.set(key(1, 0), applyHomography(real, edge));
+    table.dots.set(key(0, 0), applyHomography(real, corner));
+    points.set(key(1, 0), { x: 930, y: 0 });
+    points.set(key(0, 0), { x: 24, y: 18 });
+    const f = fake(table, points);
+    for (const [i, j, truth] of [[1, 0, edge], [0, 0, corner]] as const) {
+      const out = await autoPoint(f.host, i, j);
+      expect(out.ok, `${i}×${j}: ${out.reason}`).toBe(true);
+      const landed = applyHomography(real, points.get(key(i, j))!);
+      const dot = applyHomography(real, truth);
+      expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(1.5); // what the loop accepts
+    }
+  });
   it('sees a ring that is only a shade darker than the mat', async () => {
     const { table, points } = grid({ x: -20, y: 16 });
     table.black = 0.93;
@@ -194,7 +234,7 @@ describe('autoPoint', () => {
   it('gives up, and puts the point back, when the ring and the dot do not close in', async () => {
     const { table, points } = grid({ x: 20, y: 20 });
     // a map that sends every step the wrong way
-    const backwards = homographyFromPoints(rectCorners(W, H), [{ x: 560, y: 420 }, { x: 80, y: 410 }, { x: 90, y: 60 }, { x: 550, y: 70 }])!;
+    const backwards = homographyFromPoints(rectCorners(W, H), [{ x: 840, y: 630 }, { x: 120, y: 615 }, { x: 135, y: 90 }, { x: 825, y: 105 }])!;
     const start = { ...points.get(key(1, 1))! };
     const out = await autoPoint(fake(table, points, backwards).host, 1, 1);
     expect(out.ok).toBe(false);

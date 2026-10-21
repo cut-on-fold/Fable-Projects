@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.4** — Auto fits a circle to the ring it sees, so a
+      corner or edge point whose ring is cut off by the screen's edge still
+      gets the ring's true centre; the orange test goes by hue, so a
+      red-orange dot and orange vinyl count and yellow does not; and a pale
+      small dot at the picture's edge passes (score 25, was 40).
 - [x] **Lantern v0.4.3** — Auto looks for the ring only around where it
       should be and only on the lit mat, so a laptop or the floor past the
       mat's edge flickering between frames no longer gets the ring refused

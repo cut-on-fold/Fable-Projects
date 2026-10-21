@@ -10,7 +10,7 @@
 // centre in the plain white frame. The difference between the two, turned
 // into screen pixels through the camera map, is how far to move the point.
 
-import { applyHomography, type Mat3, type Pt } from './homography';
+import { applyHomography, solve, type Mat3, type Pt } from './homography';
 
 export interface Frame {
   width: number;
@@ -39,6 +39,8 @@ export interface RingFound extends Blob {
   peak: number;
   /** How far the counted pixels sit from the centre on average (root mean square), in pixels: a ring's radius or so, far more for noise. */
   spread: number;
+  /** The radius of the circle fitted to the ring, in pixels, or null if no circle fitted (then x, y is the plain centroid). */
+  radius: number | null;
 }
 
 /** Where to look: within `r` pixels of (x, y). */
@@ -137,6 +139,9 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
   let n = 0;
   let spread = 0;
   let peak = 0;
+  const xs = new Float64Array(count);
+  const ys = new Float64Array(count);
+  const ws = new Float64Array(count);
   for (let pass = 0; pass < (r === Infinity ? 1 : 5); pass++) {
     let sx = 0;
     let sy = 0;
@@ -153,6 +158,9 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
       // centroids are of pixel centres, half a pixel in from the index
       const x = (k % w) + 0.5;
       const y = (k - (x - 0.5)) / w + 0.5;
+      xs[n] = x;
+      ys[n] = y;
+      ws[n] = d;
       sx += x * d;
       sy += y * d;
       sxx += x * x * d;
@@ -169,21 +177,121 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
     cy = ny;
     if (moved < 0.05) break;
   }
-  return { x: cx, y: cy, n, drop, peak, spread };
+  // A ring cut off by the screen's edge (a corner point) or by the mat's edge has its centroid pulled towards
+  // the part that shows; a circle fitted to the pixels has its centre in the right place from any arc.
+  const circle = fitCircle(xs, ys, ws, n, cx, cy, r === Infinity ? Math.min(w, lit.height) / 2 : r);
+  if (circle) return { x: circle.x, y: circle.y, n, drop, peak, spread, radius: circle.radius };
+  return { x: cx, y: cy, n, drop, peak, spread, radius: null };
 }
 
 /**
- * How orange a pixel is, 0 for white, grey, blue, pink, pencil and red,
- * rising with the paint. Orange is red well above blue with green sitting
- * between the two: the score is the smaller of red-over-blue and twice
- * green-over-blue, less a penalty when green is not between. A red mat
- * line under the projector's light has red over blue too, but its green
- * is no higher than its blue, so it scores nothing. Soft, so a dot a few
- * pixels wide and blurred at the edges still scores where a hard yes-or-no
- * test on each pixel would find nothing.
+ * The circle through weighted points (Kåsa's fit: the least squares of
+ * x² + y² + Dx + Ey + F), done twice, the second time only with the
+ * points within 35% of the first radius so that specks inside or outside
+ * the ring do not count. Null if the points do not make a circle, or its
+ * centre is further than `reach` from (cx, cy), or its radius is silly.
+ */
+function fitCircle(xs: Float64Array, ys: Float64Array, ws: Float64Array, n: number, cx: number, cy: number, reach: number): { x: number; y: number; radius: number } | null {
+  // Kåsa's fit, a linear least squares, as the starting point
+  let sxx = 0;
+  let sxy = 0;
+  let syy = 0;
+  let sx = 0;
+  let sy = 0;
+  let s = 0;
+  let sxz = 0;
+  let syz = 0;
+  let sz = 0;
+  for (let k = 0; k < n; k++) {
+    // about the centroid, so the numbers stay small
+    const x = xs[k]! - cx;
+    const y = ys[k]! - cy;
+    const wt = ws[k]!;
+    const z = x * x + y * y;
+    sxx += wt * x * x;
+    sxy += wt * x * y;
+    syy += wt * y * y;
+    sx += wt * x;
+    sy += wt * y;
+    s += wt;
+    sxz += wt * x * z;
+    syz += wt * y * z;
+    sz += wt * z;
+  }
+  const sol = solve(
+    [
+      [sxx, sxy, sx],
+      [sxy, syy, sy],
+      [sx, sy, s],
+    ],
+    [-sxz, -syz, -sz],
+  );
+  if (!sol) return null;
+  const [d, e, f] = sol as [number, number, number];
+  let a = -d / 2 + cx;
+  let b = -e / 2 + cy;
+  let rad = Math.sqrt(Math.max(0, (d * d + e * e) / 4 - f));
+  if (!Number.isFinite(rad) || rad < 2 || rad > reach || Math.hypot(a - cx, b - cy) > reach) return null;
+  // Kåsa's fit leans towards the inside of a thick arc, and a quarter arc badly: a few rounds of Gauss–Newton on
+  // the true distances put it right. First with every pixel, then only with those within 35% of the radius, so
+  // specks inside or outside the ring do not count.
+  let keep: (k: number) => boolean = () => true;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let round = 0; round < 8; round++) {
+      const m = [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ];
+      const v = [0, 0, 0];
+      for (let k = 0; k < n; k++) {
+        if (!keep(k)) continue;
+        const dx = xs[k]! - a;
+        const dy = ys[k]! - b;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1e-6) continue;
+        const wt = ws[k]!;
+        const j = [-dx / dist, -dy / dist, -1];
+        const res = dist - rad;
+        for (let p = 0; p < 3; p++) {
+          v[p]! -= wt * j[p]! * res;
+          for (let q = 0; q < 3; q++) m[p]![q]! += wt * j[p]! * j[q]!;
+        }
+      }
+      const step = solve(m, v);
+      if (!step) return null;
+      a += step[0]!;
+      b += step[1]!;
+      rad += step[2]!;
+      if (Math.hypot(step[0]!, step[1]!) < 1e-4) break;
+    }
+    if (!Number.isFinite(rad) || rad < 2 || rad > reach || Math.hypot(a - cx, b - cy) > reach) return null;
+    const [fa, fb, fr] = [a, b, rad];
+    keep = (k) => Math.abs(Math.hypot(xs[k]! - fa, ys[k]! - fb) - fr) <= 0.35 * fr;
+  }
+  return { x: a, y: b, radius: rad };
+}
+
+/**
+ * How orange a pixel is, 0 for white, grey, blue, pink, pencil, red and
+ * yellow, rising with the paint. It goes by hue: with red the biggest of
+ * the three, how far green sits from blue towards red puts the hue between
+ * 0° (red) and 60° (yellow). Orange paint and orange vinyl sit around
+ * 20°–30°, a red-orange dot about 14°, a red or pink mat line under the
+ * projector's light at 0°–5° (its green no higher than its blue), a golden
+ * yellow over 40°. The score is the colourfulness (red over blue) inside a
+ * window of 14°–34°, fading to nothing by 6° and 40°, and fading out for
+ * anything dark (a wooden table's edge is brown, which is a dim orange).
+ * Soft, so a dot a few pixels wide and blurred at the edges still scores
+ * where a hard yes-or-no test on each pixel would find nothing.
  */
 export function orangeScore(r: number, g: number, b: number): number {
-  return Math.max(0, Math.min(r - b, 2 * (g - b)) - 0.6 * Math.abs(r + b - 2 * g));
+  const chroma = r - b;
+  if (chroma <= 0 || g < b || g > r) return 0;
+  const hue = (60 * (g - b)) / chroma;
+  const window = hue < 6 ? 0 : hue < 14 ? (hue - 6) / 8 : hue <= 34 ? 1 : hue < 40 ? (40 - hue) / 6 : 0;
+  const bright = Math.max(0, Math.min(1, (r - 120) / 40));
+  return chroma * window * bright;
 }
 
 export interface DotFound {
@@ -208,7 +316,7 @@ export interface DotFound {
  * is all that is expected within reach (dots are 15 cm apart and reach is
  * a few cm), so no attempt is made to tell two apart.
  */
-export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 40, minPixels = 2): DotFound | null {
+export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 25, minPixels = 2): DotFound | null {
   const { width: w, height: h, data } = frame;
   const x0 = Math.max(0, Math.floor(centre.x - reach));
   const x1 = Math.min(w - 1, Math.ceil(centre.x + reach));
