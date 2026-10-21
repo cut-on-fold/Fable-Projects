@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.1** — Auto finds a small, blurred dot by how orange
+      each pixel is rather than a hard yes or no; waits for a fresh camera
+      frame before looking; says in the summary what it saw (pixels changed,
+      best orange score); and Camera frames saves a picture of what the
+      camera saw at the last points, to send when one is skipped.
 - [x] **Lantern v0.4.0** — automatic calibration from the camera: with
       orange dots on the mat crossings, Auto projects a black ring at each
       point and moves it until the ring is centred on the dot, to about half

@@ -157,8 +157,22 @@ export class CameraPanel {
 
   private grabCanvas: HTMLCanvasElement | null = null;
 
-  /** A piece of the current camera picture, at the camera's own resolution. */
-  grab(roi: { x: number; y: number; w: number; h: number }): Frame | null {
+  /** Resolves on the camera's next new frame (or after a moment, if the browser cannot say). */
+  nextFrame(timeoutMs = 400): Promise<void> {
+    const v = this.video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+    if (typeof v.requestVideoFrameCallback !== 'function') return new Promise((r) => setTimeout(r, 100));
+    return new Promise((r) => {
+      const t = setTimeout(r, timeoutMs);
+      v.requestVideoFrameCallback!(() => {
+        clearTimeout(t);
+        r();
+      });
+    });
+  }
+
+  /** A piece of the current camera picture, at the camera's own resolution, once a new frame has arrived. */
+  async grab(roi: { x: number; y: number; w: number; h: number }): Promise<Frame | null> {
+    await this.nextFrame();
     const size = this.pictureSize();
     if (!size || roi.w <= 0 || roi.h <= 0) return null;
     this.grabCanvas ??= document.createElement('canvas');
