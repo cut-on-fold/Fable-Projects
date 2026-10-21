@@ -55,9 +55,10 @@ like to know:
       to check the calibration on the fabric without a tape.
 - [ ] **Mark and annotate** — a line snapped onto a grainline or a fold, kept
       with the placement.
-- [ ] **Camera calibration** — the camera window is there; the next step is
-      for Lantern to find the projected cross and the nearest mat line in the
-      picture itself and nudge the point until they meet, point by point.
+- [ ] **Camera calibration, further** — Auto sets the points from the dots;
+      next would be finding the corners in the picture too, so there is
+      nothing to click, and a check pass that only reports how far out each
+      point is.
 - [ ] **Shared calibrations** — export a table as a file so a second device
       driving the same projector can use it.
 
@@ -70,6 +71,12 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.0** — automatic calibration from the camera: with
+      orange dots on the mat crossings, Auto projects a black ring at each
+      point and moves it until the ring is centred on the dot, to about half
+      a millimetre; a frame with the ring minus one without leaves only the
+      ring, so the mat's own lines cancel out. The camera window keeps out
+      of the way of the selected point.
 - [x] **Lantern v0.3.7** — over the camera picture the pointer is a small
       open ring instead of an arrow, so a dot on the mat shows inside it as
       you click; the close-up corner click is at 8×.

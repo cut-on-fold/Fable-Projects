@@ -73,6 +73,22 @@ only just does. The Mac remembers the setting for the browser, separately
 from other apps, and now and then goes back to 1× on its own, so if the
 picture has narrowed, that is where to look. Centre Stage should be off.
 
+**Automatically.** With orange dots painted on the mat crossings (acrylic,
+about 4 mm, two coats) and the camera open with its corners found, **Auto**
+sets every point itself, or `A` sets the selected one and `Shift+A` all of
+them. The screen goes white and a small black ring is projected at each
+point in turn; the camera sees the ring and the dot, and the point is moved
+until the ring is centred on the dot, to about half a millimetre, usually in
+two or three goes. The tools and the camera window hide while it runs, and
+`Esc` stops it. A dot it cannot see, under the laptop or a tool, is left
+where it was and listed at the end. It works best with the room lights down,
+so the projector is the brightest thing the camera sees. The seeing is in
+`src/calc/vision.ts`: a frame with the ring minus a frame without leaves
+only the ring, so the mat's own lines and anything lying on it cancel out.
+
+The camera window also keeps out of the way: if it covers the point being
+worked on, it moves to the far corner of the screen.
+
 With no gridded mat, as on a floor: tape out a rectangle, measure it, put its
 size in the boxes, drag the corners onto it, and lay a tape measure along a
 grid line. Every point is labelled with its distance from the top-left
@@ -100,8 +116,10 @@ in table centimetres on a bent table too. `src/calc/placement.ts` is where
 the page sits (centre, turn, flip, scale). `src/render.ts` draws the page
 through the mesh with WebGL 2, with the line weight and inversion in the
 shader; `src/document.ts` opens PDFs with pdf.js (bundled, worker included)
-and SVGs through an image. `src/camera.ts` is the camera window. `src/main.ts`
-is the page.
+and SVGs through an image. `src/camera.ts` is the camera window,
+`src/calc/vision.ts` finds the ring and the dot in its picture and
+`src/autocal.ts` is the loop that moves the points. `src/main.ts` is the
+page.
 
 ```sh
 npm install
