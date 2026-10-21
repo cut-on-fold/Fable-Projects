@@ -64,6 +64,14 @@ camera needs the page served over https (the Pages site) or from localhost,
 not opened as a saved file. The camera is never measured: it only decides
 where to zoom, and your eye does the aligning.
 
+With an iPhone, how much of the table the picture shows is set by the Mac,
+not by Lantern: while the camera is open, click the green camera icon in
+the menu bar and set the zoom in that panel to 0.5×, the phone's wide lens.
+From 1.3 m that takes in a 53 × 35 in table with room to spare; at 1× it
+only just does. The Mac remembers the setting for the browser, separately
+from other apps, and now and then goes back to 1× on its own, so if the
+picture has narrowed, that is where to look. Centre Stage should be off.
+
 With no gridded mat, as on a floor: tape out a rectangle, measure it, put its
 size in the boxes, drag the corners onto it, and lay a tape measure along a
 grid line. Every point is labelled with its distance from the top-left

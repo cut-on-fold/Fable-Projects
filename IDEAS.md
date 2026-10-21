@@ -70,6 +70,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.3.6** — help and README say where the camera's field of
+      view is set with an iPhone: the Mac's green camera icon, zoom 0.5× for
+      the wide lens, remembered per app and sometimes forgotten.
 - [x] **Lantern v0.3.5** — camera window: Find corners takes two clicks per
       corner, a rough one that zooms the window in and a close one that
       counts, so the corners can be placed accurately; and no ring is drawn
