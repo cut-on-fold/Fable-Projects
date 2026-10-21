@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyHomography, homographyFromPoints, rectCorners } from '../src/calc/homography';
-import { blankFrame, correction, darkenedCentroid, dotNear, luma, orangeScore, paintDisc, type Frame } from '../src/calc/vision';
+import { blankFrame, correction, darkenedCentroid, dotNear, localScale, luma, orangeScore, paintDisc, type Frame } from '../src/calc/vision';
 
 /**
  * A white mat with faint pencil lines, a pink line, some blue lines and a red line that the camera shows
@@ -75,6 +75,29 @@ describe('darkenedCentroid', () => {
     expect(q).not.toBeNull();
     expect(Math.abs(q.x - 101.3)).toBeLessThan(0.7);
     expect(Math.abs(q.y - 77.6)).toBeLessThan(0.7);
+    expect(c.coverage).toBeLessThan(0.6);
+    expect(q.coverage).toBeLessThan(0.35);
+    expect(darkenedCentroid(lit, half, 30, 10)!.coverage).toBeLessThan(0.6);
+  });
+  it('holds the radius it is told for a short arc, which a projector blurs unevenly', () => {
+    const lit = mat();
+    const whole = mat();
+    // darker towards the inside, as the projector's black is next to the bright hole: the free fit is pulled inwards
+    for (let k = 0; k < 5; k++) dim(whole, 101.3, 77.6, 9.5 + k, 8.5 + k, 0.55 + k * 0.08);
+    const full = darkenedCentroid(lit, whole, 30, 10, { x: 101, y: 84, r: 50 })!;
+    expect(full.coverage).toBeGreaterThan(0.95);
+    expect(Math.abs(full.x - 101.3)).toBeLessThan(0.3);
+    const quarter = mat();
+    for (let k = 0; k < 5; k++) dim(quarter, 101.3, 77.6, 9.5 + k, 8.5 + k, 0.55 + k * 0.08, { x: 101.3, y: 77.6 });
+    const q = darkenedCentroid(lit, quarter, 30, 10, { x: 108, y: 84, r: 50 }, full.radius!)!;
+    expect(q).not.toBeNull();
+    expect(q.radius).toBeCloseTo(full.radius!, 5);
+    expect(Math.abs(q.x - 101.3)).toBeLessThan(0.4);
+    expect(Math.abs(q.y - 77.6)).toBeLessThan(0.4);
+  });
+  it('knows the camera scale at a point from the map', () => {
+    const h = homographyFromPoints(rectCorners(1920, 1080), [{ x: 100, y: 100 }, { x: 1060, y: 100 }, { x: 1060, y: 640 }, { x: 100, y: 640 }])!;
+    expect(localScale(h, { x: 500, y: 500 })).toBeCloseTo(0.5, 3);
   });
   it('sees a ring that is only a shade darker than the mat, as a projected black is in a lit room', () => {
     const lit = mat();

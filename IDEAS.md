@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.5** — at a corner or edge, where only a quarter or
+      half of the ring shows, Auto holds the ring's radius at what it must
+      be (as drawn, times the camera's scale there, corrected by the rings
+      it has seen whole) and fits only the centre, so the far corner
+      settles instead of sitting 2–3 px out.
 - [x] **Lantern v0.4.4** — Auto fits a circle to the ring it sees, so a
       corner or edge point whose ring is cut off by the screen's edge still
       gets the ring's true centre; the orange test goes by hue, so a

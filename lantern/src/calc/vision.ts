@@ -41,6 +41,8 @@ export interface RingFound extends Blob {
   spread: number;
   /** The radius of the circle fitted to the ring, in pixels, or null if no circle fitted (then x, y is the plain centroid). */
   radius: number | null;
+  /** How much of the circle the darkened pixels go round, 0–1: 1 for a whole ring, about 0.25 for the quarter left at a corner of the screen. */
+  coverage: number;
 }
 
 /** Where to look: within `r` pixels of (x, y). */
@@ -71,8 +73,15 @@ export interface Near {
  * search moving to the centroid found and looking again, a few times, so
  * that a speck of change elsewhere in the piece cannot pull the ring's
  * centre about or widen its spread.
+ *
+ * A circle is fitted to what darkened, so a ring cut off by the screen's
+ * edge still gives its true centre. A short arc (a quarter ring at a
+ * corner) cannot settle both the radius and the centre, so when less than
+ * three quarters of the circle shows and `expectRadius` (the ring's radius
+ * in this picture, known from how it is drawn and the camera's scale) is
+ * given, the radius is held at that and only the centre is fitted.
  */
-export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floor = 10, near?: Near): RingFound | null {
+export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floor = 10, near?: Near, expectRadius?: number): RingFound | null {
   if (lit.width !== ringed.width || lit.height !== ringed.height) return null;
   const w = lit.width;
   const count = w * lit.height;
@@ -179,9 +188,62 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
   }
   // A ring cut off by the screen's edge (a corner point) or by the mat's edge has its centroid pulled towards
   // the part that shows; a circle fitted to the pixels has its centre in the right place from any arc.
-  const circle = fitCircle(xs, ys, ws, n, cx, cy, r === Infinity ? Math.min(w, lit.height) / 2 : r);
-  if (circle) return { x: circle.x, y: circle.y, n, drop, peak, spread, radius: circle.radius };
-  return { x: cx, y: cy, n, drop, peak, spread, radius: null };
+  const circle = fitCircle(xs, ys, ws, n, cx, cy, r === Infinity ? Math.min(w, lit.height) / 2 : r, expectRadius);
+  if (circle) return { x: circle.x, y: circle.y, n, drop, peak, spread, radius: circle.radius, coverage: circle.coverage };
+  return { x: cx, y: cy, n, drop, peak, spread, radius: null, coverage: 0 };
+}
+
+/** The camera's scale at a screen point: camera pixels per screen pixel, from the slope of the map there. */
+export function localScale(h: Mat3, screen: Pt): number {
+  const eps = 1;
+  const c0 = applyHomography(h, screen);
+  const cx = applyHomography(h, { x: screen.x + eps, y: screen.y });
+  const cy = applyHomography(h, { x: screen.x, y: screen.y + eps });
+  const det = (cx.x - c0.x) * (cy.y - c0.y) - (cy.x - c0.x) * (cx.y - c0.y);
+  return Number.isFinite(det) ? Math.sqrt(Math.abs(det)) : 0;
+}
+
+/** How much of a circle the points go round: the share of 10° sectors about (a, b) that have a point in them. */
+function coverageOf(xs: Float64Array, ys: Float64Array, n: number, keep: (k: number) => boolean, a: number, b: number): number {
+  const bins = new Uint8Array(36);
+  for (let k = 0; k < n; k++) {
+    if (!keep(k)) continue;
+    const angle = Math.atan2(ys[k]! - b, xs[k]! - a);
+    bins[Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 36) % 36] = 1;
+  }
+  let filled = 0;
+  for (const bin of bins) filled += bin;
+  return filled / 36;
+}
+
+/** Gauss–Newton on the true distances: fit the centre, and the radius too unless `fixed`. Returns false if the equations fail. */
+function refine(xs: Float64Array, ys: Float64Array, ws: Float64Array, n: number, keep: (k: number) => boolean, c: { a: number; b: number; rad: number }, fixed: boolean): boolean {
+  const dims = fixed ? 2 : 3;
+  for (let round = 0; round < 8; round++) {
+    const m = Array.from({ length: dims }, () => new Array<number>(dims).fill(0));
+    const v = new Array<number>(dims).fill(0);
+    for (let k = 0; k < n; k++) {
+      if (!keep(k)) continue;
+      const dx = xs[k]! - c.a;
+      const dy = ys[k]! - c.b;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1e-6) continue;
+      const wt = ws[k]!;
+      const j = [-dx / dist, -dy / dist, -1];
+      const res = dist - c.rad;
+      for (let p = 0; p < dims; p++) {
+        v[p]! -= wt * j[p]! * res;
+        for (let q = 0; q < dims; q++) m[p]![q]! += wt * j[p]! * j[q]!;
+      }
+    }
+    const step = solve(m, v);
+    if (!step) return false;
+    c.a += step[0]!;
+    c.b += step[1]!;
+    if (!fixed) c.rad += step[2]!;
+    if (Math.hypot(step[0]!, step[1]!) < 1e-4) break;
+  }
+  return true;
 }
 
 /**
@@ -191,7 +253,7 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
  * the ring do not count. Null if the points do not make a circle, or its
  * centre is further than `reach` from (cx, cy), or its radius is silly.
  */
-function fitCircle(xs: Float64Array, ys: Float64Array, ws: Float64Array, n: number, cx: number, cy: number, reach: number): { x: number; y: number; radius: number } | null {
+function fitCircle(xs: Float64Array, ys: Float64Array, ws: Float64Array, n: number, cx: number, cy: number, reach: number, expectRadius?: number): { x: number; y: number; radius: number; coverage: number } | null {
   // Kåsa's fit, a linear least squares, as the starting point
   let sxx = 0;
   let sxy = 0;
@@ -228,48 +290,35 @@ function fitCircle(xs: Float64Array, ys: Float64Array, ws: Float64Array, n: numb
   );
   if (!sol) return null;
   const [d, e, f] = sol as [number, number, number];
-  let a = -d / 2 + cx;
-  let b = -e / 2 + cy;
-  let rad = Math.sqrt(Math.max(0, (d * d + e * e) / 4 - f));
-  if (!Number.isFinite(rad) || rad < 2 || rad > reach || Math.hypot(a - cx, b - cy) > reach) return null;
+  const c = { a: -d / 2 + cx, b: -e / 2 + cy, rad: Math.sqrt(Math.max(0, (d * d + e * e) / 4 - f)) };
+  const sane = () => Number.isFinite(c.rad) && c.rad >= 2 && c.rad <= reach && Math.hypot(c.a - cx, c.b - cy) <= reach;
+  if (!sane()) return null;
   // Kåsa's fit leans towards the inside of a thick arc, and a quarter arc badly: a few rounds of Gauss–Newton on
   // the true distances put it right. First with every pixel, then only with those within 35% of the radius, so
   // specks inside or outside the ring do not count.
   let keep: (k: number) => boolean = () => true;
+  const band = () => {
+    const { a, b, rad } = c;
+    keep = (k) => Math.abs(Math.hypot(xs[k]! - a, ys[k]! - b) - rad) <= 0.35 * rad;
+  };
   for (let pass = 0; pass < 2; pass++) {
-    for (let round = 0; round < 8; round++) {
-      const m = [
-        [0, 0, 0],
-        [0, 0, 0],
-        [0, 0, 0],
-      ];
-      const v = [0, 0, 0];
-      for (let k = 0; k < n; k++) {
-        if (!keep(k)) continue;
-        const dx = xs[k]! - a;
-        const dy = ys[k]! - b;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 1e-6) continue;
-        const wt = ws[k]!;
-        const j = [-dx / dist, -dy / dist, -1];
-        const res = dist - rad;
-        for (let p = 0; p < 3; p++) {
-          v[p]! -= wt * j[p]! * res;
-          for (let q = 0; q < 3; q++) m[p]![q]! += wt * j[p]! * j[q]!;
-        }
-      }
-      const step = solve(m, v);
-      if (!step) return null;
-      a += step[0]!;
-      b += step[1]!;
-      rad += step[2]!;
-      if (Math.hypot(step[0]!, step[1]!) < 1e-4) break;
-    }
-    if (!Number.isFinite(rad) || rad < 2 || rad > reach || Math.hypot(a - cx, b - cy) > reach) return null;
-    const [fa, fb, fr] = [a, b, rad];
-    keep = (k) => Math.abs(Math.hypot(xs[k]! - fa, ys[k]! - fb) - fr) <= 0.35 * fr;
+    if (!refine(xs, ys, ws, n, keep, c, false)) return null;
+    if (!sane()) return null;
+    band();
   }
-  return { x: a, y: b, radius: rad };
+  let coverage = coverageOf(xs, ys, n, keep, c.a, c.b);
+  // A short arc cannot settle the radius and the centre together: with the radius known, hold it and fit the centre.
+  if (coverage < 0.75 && expectRadius && expectRadius > 0) {
+    c.rad = expectRadius;
+    band();
+    for (let pass = 0; pass < 2; pass++) {
+      if (!refine(xs, ys, ws, n, keep, c, true)) return null;
+      if (!sane()) return null;
+      band();
+    }
+    coverage = coverageOf(xs, ys, n, keep, c.a, c.b);
+  }
+  return { x: c.a, y: c.b, radius: c.rad, coverage };
 }
 
 /**
