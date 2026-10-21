@@ -159,7 +159,11 @@ async function run(name, { dark }) {
   if ((await page.getAttribute('#cam-zoom-2', 'aria-pressed')) !== 'true') errors.push(`${name}: camera zoom`);
   await page.click('#cam-corners');
   const box = await page.locator('#cam-canvas').boundingBox();
-  for (const [fx, fy] of [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]]) await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+  for (const [fx, fy] of [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]]) {
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy); // rough: the window zooms in there
+    if (!/close up/.test(await page.textContent('#cam-status'))) errors.push(`${name}: corner setup did not ask for the close click`);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); // close: the centre of the zoomed view is the rough spot
+  }
   await page.waitForTimeout(250);
   s = await stored();
   if (!s.calibrations[0].camera || s.calibrations[0].camera.corners?.length !== 4 || s.calibrations[0].camera.zoom !== 2) errors.push(`${name}: camera setup stored ${JSON.stringify(s.calibrations[0].camera)}`);

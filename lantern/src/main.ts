@@ -444,7 +444,7 @@ function renderPop(): void {
         el('li', {}, el('kbd', { text: 'I' }), ' invert, ', el('kbd', { text: 'G' }), ' grid, ', el('kbd', { text: 'O' }), ' outline, ', el('kbd', { text: '+' }), ' ', el('kbd', { text: '−' }), ' line weight'),
       ),
       el('h2', { text: 'Calibrating from a chair' }),
-      el('p', { text: 'Camera opens a webcam over the table (an iPhone on a mount works as a Mac webcam) in a small window. Press Find corners and click the four corner crosses in the picture once; after that the window zooms in on whichever point is selected, so you can nudge it with the arrow keys and move on with [ and ] while watching the mat on screen. The camera needs the page served over https or from localhost.' }),
+      el('p', { text: 'Camera opens a webcam over the table (an iPhone on a mount works as a Mac webcam) in a small window. Press Find corners and click each of the four corner crosses in the picture, roughly first and then close up once the window has zoomed in; after that the window zooms in on whichever point is selected, so you can nudge it with the arrow keys and move on with [ and ] while watching the mat on screen. The camera needs the page served over https or from localhost.' }),
       el('h2', { text: 'Calibrating with a tape' }),
       el('p', { text: 'No gridded mat, as on a floor? Mark a rectangle of the size in the boxes with tape, drag the corners onto it, then lay a tape measure along each grid line: every point is labelled with its distance from the top-left corner.' }),
       el('p', {}, 'Each table keeps its own calibration; the window size it was made in is remembered, so calibrate in full screen and project in full screen. Lantern ', `v${__LANTERN_VERSION__}`, '.'),
