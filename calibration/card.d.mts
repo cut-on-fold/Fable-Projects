@@ -43,3 +43,15 @@ export interface TileSpec {
 }
 /** A page to print with a cell of dot targets, as an SVG document. */
 export function tile(spec: TileSpec): string;
+export interface DotsSpec {
+  name: string;
+  /** default 10 × 10 */
+  columns?: number;
+  rows?: number;
+  /** dot diameter, mm; default 8 */
+  dot?: number;
+  /** centre to centre, mm; default 12 */
+  pitch?: number;
+}
+/** A sheet of filled circles to cut from vinyl, as an SVG document. */
+export function dots(spec: DotsSpec): string;

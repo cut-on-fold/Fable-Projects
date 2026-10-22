@@ -45,6 +45,7 @@ And for drawing a mat for Lantern's automatic calibration:
 | `mat-36x24in-layout.svg` | 36 × 24 in | The same for a large mat |
 | `dot-tile-letter.svg` | Letter | A 6 in cell of dot targets to print at 100%, for marking or checking dots |
 | `dot-tile-a4.svg` | A4 | The same on A4 |
+| `dots-8mm-100.svg` | 120 × 120 mm | 100 circles of 8 mm to cut from orange vinyl on a Cricut or similar: just the circles, nothing else to cut |
 
 Open a projector card in Lantern or Pattern Projector the same way as a
 Grain-Nest export, calibrate as usual, then measure the squares on the table
@@ -75,6 +76,14 @@ drawn on; the inner points exist for tables that are not flat. The dot
 tile is for the last mm: print it at 100% (check the 4 in square), lay it
 with two targets on two dots and mark the next two through the centres, or
 lay it over four dots to check them.
+
+For the dots themselves, `dots-8mm-100.svg` is a sheet of a hundred 8 mm
+circles, 12 mm apart, to cut from orange vinyl. In Cricut Design Space,
+upload it as a cut image, and check its size reads 120 mm (4.72 in) square
+before cutting: if it has come in at another size, set the width to that.
+Weed away the sheet around the circles and the dots are ready to peel off
+one at a time. The sheet is 12 cm square, so it cuts from one 12 in sheet
+of vinyl with room over.
 
 Lines in **green** or **blue** (thin, about 1 mm) and dots in **orange** are
 what Auto expects: it takes orange, red-orange and orange vinyl for a dot,

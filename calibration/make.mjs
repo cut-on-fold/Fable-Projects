@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { IN, card, layout, r, tile } from './card.mjs';
+import { IN, card, dots, layout, r, tile } from './card.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -34,12 +34,21 @@ export const TILES = [
   { file: 'dot-tile-a4.svg', width: 210, height: 297, name: 'Dot tile, A4', purpose: 'a 6 in cell of dot targets to print at 100%, for marking or checking dots' },
 ];
 
+/** Sheets of dots to cut from vinyl: just the circles, for a cutting machine. */
+export const DOTS = [
+  { file: 'dots-8mm-100.svg', name: '100 dots of 8 mm', columns: 10, rows: 10, dot: 8, pitch: 12 },
+];
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = join(HERE, 'cards');
   mkdirSync(out, { recursive: true });
   for (const c of CARDS) {
     writeFileSync(join(out, c.file), card(c));
     console.log(`${c.file}  ${c.width} × ${c.height} mm${c.unit === 'in' ? ' (inch grid)' : ''}`);
+  }
+  for (const c of DOTS) {
+    writeFileSync(join(out, c.file), dots(c));
+    console.log(`${c.file}  ${c.columns * c.pitch} × ${c.rows * c.pitch} mm (${c.columns * c.rows} dots to cut)`);
   }
   for (const c of LAYOUTS) {
     writeFileSync(join(out, c.file), layout(c));
