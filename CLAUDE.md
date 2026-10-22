@@ -175,6 +175,8 @@ Grain-Nest. Each project lives in its own folder with its own README;
   `scripts/smoke.mjs` clicks through the built page in headless Chromium.
 - `calibration/` — `card.mjs` draws a calibration card; `make.mjs` writes the
   SVG test cards in `cards/`; CI checks the committed cards match the script.
+- `stencil/` — `dot-stencil.scad`, a printed stencil for painting the orange
+  dots at the mat's crossings, with its STL and `preview.png`.
 - `mount/` — `phone-pocket.scad`, a printed ceiling pocket for the phone
   Lantern uses as a camera, with STLs exported from it (OpenSCAD 2021.01).
 - `site/` — the landing page; the Pages workflow copies each project's `dist`

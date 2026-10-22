@@ -118,6 +118,10 @@ like to know:
       counts, so the corners can be placed accurately; and no ring is drawn
       at the window's centre, which sat a little off the projected cross and
       read as the thing to align with. The cross in the video is the target.
+- [x] **Dot stencil** — `stencil/dot-stencil.scad` and its STL: a printed
+      40 mm plate with an 8 mm hole, a V-notch in each edge to line up with
+      the mat's lines, sighting grooves and a lifting tab, for painting the
+      dots at the crossings instead of sticking them.
 - [x] **Dot sheet to cut** — `calibration/cards/dots-8mm-100.svg`: a hundred
       8 mm circles, 12 mm apart, for cutting from orange vinyl on a Cricut.
 - [x] **Mat layout cards** — `calibration/cards/mat-53x35in-layout.svg`
