@@ -118,6 +118,8 @@ like to know:
       counts, so the corners can be placed accurately; and no ring is drawn
       at the window's centre, which sat a little off the projected cross and
       read as the thing to align with. The cross in the video is the target.
+- [x] **Dot sheet to cut** — `calibration/cards/dots-8mm-100.svg`: a hundred
+      8 mm circles, 12 mm apart, for cutting from orange vinyl on a Cricut.
 - [x] **Mat layout cards** — `calibration/cards/mat-53x35in-layout.svg`
       (and 36 × 24 in): lines every 12 in and an 8 mm target for a dot every
       6 in, placed and labelled as Lantern places its points, to project and

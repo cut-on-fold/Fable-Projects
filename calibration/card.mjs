@@ -267,6 +267,30 @@ export function layout({ width, height, name, purpose, lineEvery = 12 * IN, dotE
 }
 
 /**
+ * A sheet of dots to cut from vinyl on a cutting machine: `columns` ×
+ * `rows` filled circles of `dot` mm, `pitch` mm apart, with half a pitch
+ * of margin, so the sheet is columns × pitch wide. Nothing but the circles,
+ * since a cutting machine cuts everything it is given: no text, no border.
+ * Sized in millimetres in the SVG itself, which Cricut Design Space reads.
+ */
+export function dots({ name, columns = 10, rows = 10, dot = 8, pitch = 12 }) {
+  const width = columns * pitch;
+  const height = rows * pitch;
+  const circles = [];
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < columns; i++) {
+      circles.push(`<circle cx="${r((i + 0.5) * pitch)}" cy="${r((j + 0.5) * pitch)}" r="${r(dot / 2)}" fill="${DOT}"/>`);
+    }
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${r(width)}mm" height="${r(height)}mm" viewBox="0 0 ${r(width)} ${r(height)}">
+<title>${esc(name)}</title>
+${circles.join('\n')}
+</svg>
+`;
+}
+
+/**
  * A page to print at 100%: a square of `cell` (6 in) with a dot target at
  * each corner, for marking or checking dots on a mat a cell at a time, and
  * a 4 in square to check the printer's scale first.
