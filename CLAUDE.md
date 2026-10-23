@@ -187,7 +187,9 @@ Grain-Nest. Each project lives in its own folder with its own README;
 In each web project: `npm test`, `npm run typecheck`, `npm run build`, and
 for Thimble and Lantern `npm run smoke` (needs Chromium; CI installs it).
 `node calibration/make.mjs` must leave `calibration/cards/` unchanged.
-`.github/workflows/tests.yml` runs all of that; `pages.yml` publishes from
+`.github/workflows/tests.yml` runs all of that, but only for the projects
+the change touches (a change to `calibration/` or to the workflow tests
+everything), with a timeout on every job; `pages.yml` publishes from
 `main`; `tidy.yml` clears artifacts by hand.
 
 ## Particular to this repository
