@@ -6,7 +6,7 @@
 
 import type { Mat3, Pt } from './calc/homography';
 import { applyHomography } from './calc/homography';
-import { correction, darkenedCentroid, dotNear, localScale, type Frame } from './calc/vision';
+import { correction, darkenedCentroid, dotNear, localScale, type Frame, type RingFound } from './calc/vision';
 
 /** The ring as drawn on the white screen: a black annulus between these radii, in screen pixels. */
 export const RING_INNER = 22;
@@ -24,6 +24,8 @@ export interface AutoHost {
   homography(): Mat3 | null;
   /** The camera picture's size, in its own pixels. */
   pictureSize(): { w: number; h: number } | null;
+  /** The screen's size, in screen pixels: where the projected picture ends. */
+  screenSize(): { w: number; h: number };
   /** A piece of the current camera picture, after waiting for a fresh frame. */
   grab(roi: { x: number; y: number; w: number; h: number }): Promise<Frame | null>;
   /** Draw the ring at a screen point, or nothing; resolves once it is on screen. */
@@ -48,6 +50,11 @@ export interface Diagnostic {
   dot: { x: number; y: number; n: number; peak: number; spread: number } | null;
   /** The ring's expected place in the picture from the corners, within the roi. */
   guess: Pt;
+  /**
+   * For a point at the screen's edge, where its ring would be cut off: the rings were shown this far in from
+   * it (screen px), twice, and `ring` is where the ring at the point itself would be, worked out from the two.
+   */
+  inward: Pt | null;
   outcome: AutoOutcome;
 }
 
@@ -71,6 +78,19 @@ const DONE_GAP = 0.5; // camera px
 const MAX_STEP = 60; // screen px per go, as a safety stop
 const MAX_TRAVEL = 120; // screen px from where the point started, in all
 const MAX_ROUNDS = 6;
+const STEP_IN = RING_OUTER + 16; // screen px: how far in from the screen's edge the rings are shown for an edge point
+
+/**
+ * For a point whose ring would be cut off by the screen's edge (a corner or
+ * edge point), the step inward, each way it is cut, that puts a whole ring
+ * on the lit mat; null for a point whose ring shows whole where it is.
+ */
+export function inwardStep(p: Pt, screen: { w: number; h: number }): Pt | null {
+  const edge = RING_OUTER + 2;
+  const dx = p.x < edge ? 1 : p.x > screen.w - edge ? -1 : 0;
+  const dy = p.y < edge ? 1 : p.y > screen.h - edge ? -1 : 0;
+  return dx || dy ? { x: dx * STEP_IN, y: dy * STEP_IN } : null;
+}
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -86,9 +106,18 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
   const start = host.getPoint(i, j);
   const guess = applyHomography(h, start);
   if (!Number.isFinite(guess.x) || !Number.isFinite(guess.y)) return { i, j, ok: false, gap: NaN, reason: 'the corners give no sensible map' };
+  // A corner or edge point has its ring cut off by the screen's edge, and a quarter of a ring in the dimmest part
+  // of the picture is too little to measure from. So the rings are shown a step in from such a point, and two
+  // steps in, both whole, and where the ring at the point itself would be follows from the two: as far again
+  // beyond the first as the first is from the second.
+  const inward = inwardStep(start, host.screenSize());
+  const add = (a: Pt, b: Pt, k = 1): Pt => ({ x: a.x + b.x * k, y: a.y + b.y * k });
+  // the piece of the picture to watch: around the point, or around the first stepped-in ring, with the second
+  // ring and the dot either side of it
+  const centre = inward ? applyHomography(h, add(start, inward)) : guess;
   const roi = {
-    x: Math.round(Math.max(0, Math.min(size.w - ROI, guess.x - ROI / 2))),
-    y: Math.round(Math.max(0, Math.min(size.h - ROI, guess.y - ROI / 2))),
+    x: Math.round(Math.max(0, Math.min(size.w - ROI, centre.x - ROI / 2))),
+    y: Math.round(Math.max(0, Math.min(size.h - ROI, centre.y - ROI / 2))),
     w: Math.min(ROI, size.w),
     h: Math.min(ROI, size.h),
   };
@@ -102,7 +131,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
   const lit = await host.grab(roi);
   if (!lit) return { i, j, ok: false, gap: NaN, reason: 'no camera picture' };
   const guessInRoi = { x: guess.x - roi.x, y: guess.y - roi.y };
-  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, outcome: { i, j, ok: false, gap: NaN } };
+  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, inward, outcome: { i, j, ok: false, gap: NaN } };
   let p = { ...start };
   const finish = (outcome: AutoOutcome): AutoOutcome => {
     if (!outcome.ok && (p.x !== start.x || p.y !== start.y)) host.setPoint(i, j, start);
@@ -111,30 +140,50 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
     return outcome;
   };
 
+  /** Show the ring at a screen point and find it in the picture, looking around `expected` (roi px). */
+  const seeRing = async (at: Pt, expected: Pt): Promise<RingFound | string> => {
+    await host.showRing(at);
+    await wait(host.settleMs);
+    const ringed = await host.grab(roi);
+    if (!ringed) return 'no camera picture';
+    diag.ringed = ringed;
+    const near = { ...expected, r: RING_REACH };
+    // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
+    const scale = localScale(h, at);
+    const expectRadius = scale * median(memory.ringScales, RING_MEAN);
+    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
+    diag.ring = ring;
+    if (!ring) {
+      const seen = darkenedCentroid(lit, ringed, 1, 10, near);
+      return `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)`;
+    }
+    if (ring.spread > RING_SPREAD) return `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)`;
+    if (ring.radius && ring.coverage >= 0.9 && scale > 0) memory.ringScales.push(ring.radius / scale);
+    return ring;
+  };
+  const inRoi = (q: Pt): Pt => {
+    const c = applyHomography(h, q);
+    return { x: c.x - roi.x, y: c.y - roi.y };
+  };
+
   let gap = NaN;
   // where the ring should land: first where the corners say, then on the dot it was sent towards
   let expected = guessInRoi;
   let stalls = 0;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (host.stopped()) return finish({ i, j, ok: false, gap, reason: 'stopped' });
-    await host.showRing(p);
-    await wait(host.settleMs);
-    const ringed = await host.grab(roi);
-    if (!ringed) return finish({ i, j, ok: false, gap, reason: 'no camera picture' });
-    diag.ringed = ringed;
-    const near = { ...expected, r: RING_REACH };
-    // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
-    const scale = localScale(h, p);
-    const expectRadius = scale * median(memory.ringScales, RING_MEAN);
-    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
-    diag.ring = ring;
-    if (ring?.radius && ring.coverage >= 0.9 && scale > 0) memory.ringScales.push(ring.radius / scale);
-    if (!ring) {
-      const seen = darkenedCentroid(lit, ringed, 1, 10, near);
-      return finish({ i, j, ok: false, gap, reason: `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)` });
-    }
-    if (ring.spread > RING_SPREAD) {
-      return finish({ i, j, ok: false, gap, reason: `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)` });
+    let ring: Pt;
+    if (inward) {
+      const first = await seeRing(add(p, inward), inRoi(add(p, inward)));
+      if (typeof first === 'string') return finish({ i, j, ok: false, gap, reason: first });
+      const second = await seeRing(add(p, inward, 2), inRoi(add(p, inward, 2)));
+      if (typeof second === 'string') return finish({ i, j, ok: false, gap, reason: second });
+      ring = { x: 2 * first.x - second.x, y: 2 * first.y - second.y };
+      diag.ring = { ...first, x: ring.x, y: ring.y };
+    } else {
+      const seen = await seeRing(p, expected);
+      if (typeof seen === 'string') return finish({ i, j, ok: false, gap, reason: seen });
+      ring = seen;
     }
     const dot = dotNear(lit, ring, DOT_REACH, DOT_SCORE);
     diag.dot = dot;

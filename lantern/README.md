@@ -103,7 +103,10 @@ to frame; and it fits a circle to what it sees, so a corner or edge point
 whose ring is cut off by the screen's edge still gets the ring's true
 centre (with less than three quarters of the ring showing, the radius is
 held at what it must be, from how the ring is drawn and the camera's
-scale there, and only the centre is fitted). The dot is found by hue: orange paint, orange vinyl and a
+scale there, and only the centre is fitted). For a corner or edge point,
+whose ring would be cut off by the screen, the rings are shown a step in
+from the point and two steps in, both whole, and where the ring at the
+point itself would be follows from the two. The dot is found by hue: orange paint, orange vinyl and a
 red-orange dot count, red and pink mat lines, yellow and brown do not;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.

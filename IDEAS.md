@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.7** — for a corner or edge point, whose ring would be
+      cut off by the screen, Auto shows two whole rings stepped in from the
+      point and works out where the ring at the point would be from them,
+      instead of measuring a quarter ring in the dimmest part of the
+      picture; the corners no longer get pulled off.
 - [x] **Lantern v0.4.6** — Snapshot in the camera window saves the whole
       picture as the camera sees it, to check the projection from the chair
       or to send.
