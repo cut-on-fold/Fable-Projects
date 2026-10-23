@@ -82,10 +82,11 @@ const RING_REACH = 90; // camera px: how far from where the ring should be to lo
 const RING_SPREAD = 60; // camera px: darkening further out than this on average is not a ring
 const DOT_SPREAD = 8; // camera px: orange further out than this on average is a line or a smear, not a dot
 const DOT_SCORE = 25; // the least orange score a pixel needs to be part of the dot (a small dot at the picture's edge is pale)
-const DONE_GAP = 0.5; // camera px
+const DONE_GAP = 0.4; // camera px: close enough to stop
+const ACCEPT_GAP = 1; // camera px: the most a point is kept at when the goes run out (about 1.3 mm on a 135 cm table)
 const MAX_STEP = 60; // screen px per go, as a safety stop
 const MAX_TRAVEL = 120; // screen px from where the point started, in all
-const MAX_ROUNDS = 6;
+const MAX_ROUNDS = 8; // measurements; the last one is never followed by an unmeasured move
 const STEP_IN = RING_OUTER + 16; // screen px: how far in from the screen's edge the rings are shown for an edge point
 const STALE_MOVE = 2.5; // camera px: a ring expected to move at least this far should not be found where it was
 const STALE_STILL = 1; // camera px: found this close to where it was last time counts as not having moved
@@ -266,6 +267,8 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
     gap = Math.hypot(dotCam.x - ringCam.x, dotCam.y - ringCam.y);
     host.progress(`${gap.toFixed(1)} px off`);
     if (gap <= DONE_GAP) break;
+    // the last go only measures: a point is never left on a move that was not looked at
+    if (round === MAX_ROUNDS - 1) break;
     // each go should take most of the gap away; two goes running that do not close it mean the dot found is not
     // the one under the ring (one go can be noise, a ring cut off by the screen's edge being seen less surely)
     if (round > 0 && gap > was * 0.7 + DONE_GAP) {
@@ -286,8 +289,9 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
     host.setPoint(i, j, p);
   }
   await host.showRing(null);
-  // Not settled to the half pixel but close: keep it, it is better than where it started.
-  return finish({ i, j, ok: gap <= 1.5, gap, reason: gap <= 1.5 ? undefined : 'did not settle' });
+  // Not settled to the half pixel but close: keep it, it is better than where it started. Further out than that
+  // after all the goes, the point goes back, since a wrong dot or a wobbling measurement is the likelier story.
+  return finish({ i, j, ok: gap <= ACCEPT_GAP, gap, reason: gap <= ACCEPT_GAP ? undefined : `did not settle (${gap.toFixed(1)} px off after ${MAX_ROUNDS} goes)` });
 }
 
 /** The middle value, or `fallback` with nothing to take it from. */
