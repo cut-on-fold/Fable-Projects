@@ -543,6 +543,7 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
   const host: AutoHost = {
     homography: () => panel.homography(),
     pictureSize: () => panel.pictureSize(),
+    screenSize: () => ({ w: window.innerWidth, h: window.innerHeight }),
     grab: (roi) => panel.grab(roi),
     record: (d) => {
       autoDiagnostics.push(d);
@@ -648,7 +649,7 @@ function saveDiagnostics(): void {
     ctx.fillStyle = '#646b70';
     ctx.font = '11px Atkinson Hyperlegible, sans-serif';
     ctx.fillText('plain (blue ring: where expected)', 10, top + cell + 12);
-    ctx.fillText('with the ring', 20 + cell, top + cell + 12);
+    ctx.fillText(d.inward ? 'with the second ring, stepped in from the edge (circle: where the ring at the point would be)' : 'with the ring', 20 + cell, top + cell + 12);
     ctx.fillText(`darkened: ${d.ring ? `${d.ring.n} px by over ${Math.round(d.ring.drop)} (most ${Math.round(d.ring.peak)}), spread ${Math.round(d.ring.spread)}, circle ${d.ring.radius ? `r ${d.ring.radius.toFixed(1)}, ${Math.round(d.ring.coverage * 100)}% of it` : 'not fitted'}` : 'none'}`, 30 + cell * 2, top + cell + 12);
     ctx.fillText(`orange score: ${d.dot ? `${d.dot.n} px, peak ${Math.round(d.dot.peak)}, spread ${d.dot.spread.toFixed(1)}` : 'nothing'}`, 40 + cell * 3, top + cell + 12);
   });

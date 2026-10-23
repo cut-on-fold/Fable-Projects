@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyHomography, homographyFromPoints, invert, rectCorners, type Mat3, type Pt } from '../src/calc/homography';
 import { blankFrame, localScale, paintDisc, type Frame } from '../src/calc/vision';
-import { autoCalibrate, autoPoint, RING_INNER, RING_OUTER, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
+import { autoCalibrate, autoPoint, inwardStep, RING_INNER, RING_OUTER, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
 
 // A pretend table seen by a pretend camera: a white mat with reddish lines through every dot, orange dots,
 // and a projector that dims a ring where it is told to. The camera's map of the screen is a little wrong,
@@ -127,6 +127,7 @@ function fake(table: Table, points: Map<string, Pt>, map: Mat3 = clicked): Fake 
   const host: AutoHost = {
     homography: () => map,
     pictureSize: () => PIC,
+    screenSize: () => ({ w: W, h: H }),
     grab: async (roi) => crop(picture(table, ring, seed++), roi),
     showRing: async (p) => {
       ring = p;
@@ -205,8 +206,18 @@ describe('autoPoint', () => {
       expect(out.ok, `${i}×${j}: ${out.reason}`).toBe(true);
       const landed = applyHomography(real, points.get(key(i, j))!);
       const dot = applyHomography(real, truth);
-      expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(1.5); // what the loop accepts
+      // what the loop accepts; the corner dot sits half in the unlit picture here, which shifts its measured centre
+      expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(1.5);
     }
+  });
+  it('steps the rings in from the screen edge only for a point whose ring would be cut off', () => {
+    const screen = { w: W, h: H };
+    expect(inwardStep({ x: 900, y: 500 }, screen)).toBeNull();
+    expect(inwardStep({ x: 900, y: 0 }, screen)).toEqual({ x: 0, y: 50 });
+    expect(inwardStep({ x: 0, y: 0 }, screen)).toEqual({ x: 50, y: 50 });
+    expect(inwardStep({ x: W, y: H }, screen)).toEqual({ x: -50, y: -50 });
+    expect(inwardStep({ x: 20, y: H - 10 }, screen)).toEqual({ x: 50, y: -50 });
+    expect(inwardStep({ x: 40, y: 500 }, screen)).toBeNull(); // the whole ring just fits
   });
   it('sees a ring that is only a shade darker than the mat', async () => {
     const { table, points } = grid({ x: -20, y: 16 });
