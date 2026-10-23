@@ -1,6 +1,10 @@
 name: Tests
 
 # Runs once per commit: on pull requests for branches, on push for main.
+# A first job looks at what the commit touched and only the projects it
+# touched are tested; a change to the card script or to this file tests
+# everything, since Lantern uses the card script. Every job has a timeout
+# so a hung step cannot hold a pull request for hours.
 on:
   push:
     branches: [main]
@@ -8,12 +12,57 @@ on:
   pull_request:
     paths: ['thimble/**', 'bolt-end/**', 'lantern/**', 'calibration/**', '.github/workflows/tests.yml']
 
+permissions:
+  contents: read
+
 jobs:
-  web:
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      projects: ${{ steps.pick.outputs.projects }}
+      cards: ${{ steps.pick.outputs.cards }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: pick
+        name: Which projects the change touches
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            changed=$(git diff --name-only "origin/$BASE...$SHA")
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$BEFORE" "$SHA")
+          else
+            changed=$(git show --name-only --format= "$SHA")
+          fi
+          printf 'Changed:\n%s\n' "$changed"
+          all=false
+          if grep -qE '^(calibration/|\.github/workflows/tests\.yml)' <<<"$changed"; then all=true; fi
+          projects=()
+          for p in thimble bolt-end lantern; do
+            if $all || grep -q "^$p/" <<<"$changed"; then projects+=("\"$p\""); fi
+          done
+          list=$(IFS=,; echo "${projects[*]}")
+          echo "projects=[$list]" >> "$GITHUB_OUTPUT"
+          echo "cards=$all" >> "$GITHUB_OUTPUT"
+          echo "Testing: [$list]; cards: $all"
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        project: [thimble, bolt-end, lantern]
+        project: ${{ fromJSON(needs.changes.outputs.projects) }}
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -42,7 +91,10 @@ jobs:
           retention-days: 5
 
   calibration:
+    needs: changes
+    if: needs.changes.outputs.cards == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
