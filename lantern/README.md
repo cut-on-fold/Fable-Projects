@@ -128,9 +128,13 @@ a point and looking, so when a ring that should have moved is found where
 it was, the frame is taken again rather than trusted; Camera frames says
 when that happened. While it runs, nothing but the ring is on the screen:
 no tools, no Show tools button, no pointer. The dot is found by hue: orange paint, orange vinyl and a
-red-orange dot count, red and pink mat lines, yellow and brown do not;
-`tests/autocal.test.ts` runs the whole loop against a pretend table and
-camera.
+red-orange dot count, red and pink mat lines, yellow and brown do not; and
+its centre is the middle of the orange patch's shape, every pixel counting
+the same and a glint bleached white inside it filled in, because the side
+of a dot facing the projector is lit more strongly, and an average that
+leans on the brighter pixels moved every point a couple of millimetres the
+same way. `tests/autocal.test.ts` runs the whole loop against a pretend
+table and camera.
 
 The camera window also keeps out of the way: if it covers the point being
 worked on, it moves to the far corner of the screen.
