@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.8** — a corner can be moved on its own, with the
+      inner points staying where they are: Shift while dragging, or the
+      Corner alone switch for drags and arrow keys; `A` on a corner moves it
+      alone too, so a corner put right after a good run does not drag the
+      rest with it.
 - [x] **Lantern v0.4.7** — for a corner or edge point, whose ring would be
       cut off by the screen, Auto shows two whole rings stepped in from the
       point and works out where the ring at the point would be from them,

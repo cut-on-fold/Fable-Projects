@@ -2,7 +2,7 @@ import './styles.css';
 import type { Pt } from './calc/homography';
 import {
   cellLines, cols, corners, foldedCells, gridLines, isCornersOnly, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, rows, screenToTable,
-  spacing, tablePointAt, tableToScreen, triangulate, withPoint, withSize, withSpacing, type Mesh,
+  spacing, tablePointAt, tableToScreen, triangulate, withPoint, withPointAlone, withSize, withSpacing, type Mesh,
 } from './calc/mesh';
 import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement, rotated, tableToPage, type PageSize, type Placement } from './calc/placement';
 import { openFile, type Opened } from './document';
@@ -42,6 +42,8 @@ interface State {
   showGrid: boolean;
   showOutline: boolean;
   barHidden: boolean;
+  /** Move a corner on its own, leaving the inner points where they are, rather than taking them with it. */
+  cornersAlone: boolean;
 }
 
 // ---------- state
@@ -79,6 +81,7 @@ function load(): State {
     showGrid: false,
     showOutline: true,
     barHidden: false,
+    cornersAlone: false,
   };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -102,6 +105,7 @@ function load(): State {
       showGrid: !!p.showGrid,
       showOutline: p.showOutline !== false,
       barHidden: false,
+      cornersAlone: p.cornersAlone === true,
     };
   } catch {
     return fallback;
@@ -152,7 +156,7 @@ let autoText = '';
 let autoSummary: string | null = null;
 /** What the camera saw at the last points set, newest last, for the Camera frames picture. */
 let autoDiagnostics: Diagnostic[] = [];
-let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number } | { kind: 'pattern'; last: Pt } | null = null;
+let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number; alone: boolean } | { kind: 'pattern'; last: Pt } | null = null;
 let meshDirty = true;
 
 // ---------- DOM helpers
@@ -287,6 +291,21 @@ function buildBar(): void {
       isCornersOnly(m)
         ? btn('Add points', { id: 'add-points', class: 'btn primary', title: 'Put a point every 15 cm or 6 in between the corners, to drag where the table is out', onclick: () => { stepBox.value = inputText(defaultStep, state.unit); applyStep(defaultStep); } })
         : btn('Corners only', { id: 'reset-corners', title: 'Forget the inner points and go back to four corners', onclick: () => { stepBox.value = ''; applyStep(0); } }),
+      ...(isCornersOnly(m)
+        ? []
+        : [
+            btn('Corner alone', {
+              id: 'corner-alone',
+              'aria-pressed': String(state.cornersAlone),
+              title: 'Move a corner on its own, leaving the inner points where they are, instead of taking them with it. Shift while dragging does the same for one drag.',
+              onclick: () => {
+                state.cornersAlone = !state.cornersAlone;
+                save();
+                buildBar();
+                refreshHint();
+              },
+            }),
+          ]),
     );
 
     const manage = el(
@@ -387,7 +406,7 @@ function refreshHint(): void {
     hint.textContent =
       isCornersOnly(m)
         ? 'Step 1: go full screen and drag the four corner circles onto the corners of the mat (or a measured rectangle) until the grid lines land on the mat’s lines. Step 2, if the middle is still out: there are no inner points yet, so press Add points, or type how far apart you want them (6 in lands on a mat’s inch lines). Circles appear at the new crossings and drag like the corners. Arrow keys nudge the selected circle; Tab picks the next one along the row, Shift+Tab the next one down; H hides these tools if a corner is under them.'
-        : 'Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); Tab picks the next one along the row, Shift+Tab the next one down. Points every sets how far apart they are.'
+        : `Drag each circle until it sits on the mat crossing it is labelled with (the labels are distances from the top-left corner). Where the table dips or the lens bulges, the grid bends to follow. Arrow keys nudge the selected circle (Shift for 10 px, Alt for ¼ px); Tab picks the next one along the row, Shift+Tab the next one down. Points every sets how far apart they are. ${state.cornersAlone ? 'Corner alone is on: a corner moves without the inner points.' : 'A corner takes the inner points with it; Shift while dragging, or Corner alone, moves it on its own.'}`
   } else {
     hint.textContent = doc
       ? 'Drag to move the pattern. Arrow keys move it 1 cm (Shift 10 cm, Alt 1 mm). The picture bends with the calibration, so a dip in the table is already allowed for.'
@@ -555,7 +574,9 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
       await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     },
     getPoint: (i, j) => pointAt(mesh(), i, j),
-    setPoint: (i, j, p) => setMesh(withPoint(mesh(), i, j, p)),
+    // Setting one point, or with Corner alone on, a corner moves on its own; in a full run the corners come first
+    // and the inner points follow them to roughly the right places before being set themselves.
+    setPoint: (i, j, p) => setMesh((points.length === 1 || state.cornersAlone ? withPointAlone : withPoint)(mesh(), i, j, p)),
     settleMs: 700,
     progress: (text) => {
       autoText = text;
@@ -1034,7 +1055,7 @@ stage.addEventListener('pointerdown', (e) => {
     if (hit) {
       const q = pointAt(mesh(), hit.i, hit.j);
       selected = hit;
-      dragging = { kind: 'point', i: hit.i, j: hit.j, dx: q.x - p.x, dy: q.y - p.y };
+      dragging = { kind: 'point', i: hit.i, j: hit.j, dx: q.x - p.x, dy: q.y - p.y, alone: e.shiftKey || state.cornersAlone };
       stage.setPointerCapture(e.pointerId);
       redraw();
     }
@@ -1056,7 +1077,8 @@ stage.addEventListener('pointermove', (e) => {
     return;
   }
   if (dragging.kind === 'point') {
-    setMesh(withPoint(mesh(), dragging.i, dragging.j, { x: p.x + dragging.dx, y: p.y + dragging.dy }));
+    const move = dragging.alone ? withPointAlone : withPoint;
+    setMesh(move(mesh(), dragging.i, dragging.j, { x: p.x + dragging.dx, y: p.y + dragging.dy }));
   } else if (state.placement) {
     const m = mesh();
     const a = screenToTable(m, dragging.last);
@@ -1093,7 +1115,8 @@ window.addEventListener('keydown', (e) => {
     if (state.mode === 'calibrate' && selected) {
       const step = e.shiftKey ? 10 : e.altKey ? 0.25 : 1;
       const q = pointAt(mesh(), selected.i, selected.j);
-      setMesh(withPoint(mesh(), selected.i, selected.j, { x: q.x + dx * step, y: q.y + dy * step }));
+      const move = state.cornersAlone ? withPointAlone : withPoint;
+      setMesh(move(mesh(), selected.i, selected.j, { x: q.x + dx * step, y: q.y + dy * step }));
       refreshHint();
     } else if (state.mode === 'project' && state.placement) {
       const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
