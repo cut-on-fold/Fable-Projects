@@ -636,7 +636,7 @@ function saveDiagnostics(): void {
   };
   autoDiagnostics.forEach((d, row) => {
     const y = 10 + row * rowH;
-    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}`;
+    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}${d.retakes ? ` (the picture lagged: ${d.retakes} frame${d.retakes === 1 ? '' : 's'} taken again)` : ''}`;
     ctx.fillStyle = '#000';
     ctx.font = '13px Atkinson Hyperlegible, sans-serif';
     ctx.fillText(label, 10, y + 16);
@@ -738,7 +738,8 @@ function setWeight(w: number): void {
 function setBarHidden(hidden: boolean): void {
   state.barHidden = hidden;
   bar.hidden = hidden;
-  peek.hidden = !hidden;
+  // while Auto runs nothing but the ring is drawn: no Show tools button to land in the camera's picture
+  peek.hidden = !hidden || !!autoRun;
   if (hidden) {
     popOpen = null;
     renderPop();

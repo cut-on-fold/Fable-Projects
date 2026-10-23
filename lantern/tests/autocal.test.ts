@@ -119,8 +119,9 @@ interface Fake {
   progress: string[];
 }
 
-function fake(table: Table, points: Map<string, Pt>, map: Mat3 = clicked): Fake {
+function fake(table: Table, points: Map<string, Pt>, map: Mat3 = clicked, lag = false): Fake {
   let ring: Pt | null = null;
+  let caughtUp: Pt | null = null; // what the camera's picture shows: one grab behind the screen when it lags
   let seed = 1;
   let stopped = false;
   const progress: string[] = [];
@@ -128,7 +129,11 @@ function fake(table: Table, points: Map<string, Pt>, map: Mat3 = clicked): Fake 
     homography: () => map,
     pictureSize: () => PIC,
     screenSize: () => ({ w: W, h: H }),
-    grab: async (roi) => crop(picture(table, ring, seed++), roi),
+    grab: async (roi) => {
+      const frame = crop(picture(table, lag ? caughtUp : ring, seed++), roi);
+      caughtUp = ring;
+      return frame;
+    },
     showRing: async (p) => {
       ring = p;
     },
@@ -179,6 +184,29 @@ describe('autoPoint', () => {
     const dot = table.dots.get(key(1, 1))!;
     expect(Math.hypot(landed.x - dot.x, landed.y - dot.y)).toBeLessThan(1);
     expect(f.progress.length).toBeLessThanOrEqual(4);
+  });
+  it('waits for a camera picture that lags the screen, instead of correcting twice and overshooting', async () => {
+    const { table, points } = grid({ x: 36, y: -28 });
+    const f = fake(table, points, clicked, true);
+    let retakes = 0;
+    f.host.record = (d) => {
+      retakes += d.retakes;
+    };
+    const out = await autoPoint(f.host, 1, 1);
+    expect(out.ok, out.reason).toBe(true);
+    const landed = applyHomography(real, points.get(key(1, 1))!);
+    const dot = table.dots.get(key(1, 1))!;
+    expect(Math.hypot(landed.x - dot.x, landed.y - dot.y)).toBeLessThan(1);
+    expect(retakes).toBeGreaterThan(0);
+    // the same lag at a corner, where two stepped-in rings are shown each go
+    const corner = { x: 0, y: 0 };
+    table.dots.set(key(0, 0), applyHomography(real, corner));
+    points.set(key(0, 0), { x: 24, y: 18 });
+    const c = await autoPoint(f.host, 0, 0);
+    expect(c.ok, c.reason).toBe(true);
+    const landedC = applyHomography(real, points.get(key(0, 0))!);
+    const dotC = applyHomography(real, corner);
+    expect(Math.hypot(landedC.x - dotC.x, landedC.y - dotC.y)).toBeLessThan(1.5);
   });
   it('is not put off by a laptop or the floor flickering in the picture', async () => {
     const { table, points } = grid({ x: 24, y: -18 });

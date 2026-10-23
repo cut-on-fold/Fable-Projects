@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.10** — Auto notices a camera frame that still shows
+      the ring where it was before the point moved and takes the frame
+      again, instead of measuring a gap already corrected and overshooting;
+      Camera frames says when the picture lagged. While Auto runs the
+      Show tools button and the pointer are off the screen too.
 - [x] **Lantern v0.4.9** — at a corner or edge, Auto refuses the point
       when a stepped-in ring is not whole or the two rings are not where
       they should be relative to each other (a tool lying over one), and

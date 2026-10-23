@@ -55,6 +55,8 @@ export interface Diagnostic {
    * it (screen px), twice, and `ring` is where the ring at the point itself would be, worked out from the two.
    */
   inward: Pt | null;
+  /** Frames taken again because the picture still showed the ring where it was before the point moved. */
+  retakes: number;
   outcome: AutoOutcome;
 }
 
@@ -79,6 +81,9 @@ const MAX_STEP = 60; // screen px per go, as a safety stop
 const MAX_TRAVEL = 120; // screen px from where the point started, in all
 const MAX_ROUNDS = 6;
 const STEP_IN = RING_OUTER + 16; // screen px: how far in from the screen's edge the rings are shown for an edge point
+const STALE_MOVE = 2.5; // camera px: a ring expected to move at least this far should not be found where it was
+const STALE_STILL = 1; // camera px: found this close to where it was last time counts as not having moved
+const MAX_RETAKES = 3; // frames to take again, waiting a settle each time, for a picture that lags the screen
 
 /**
  * For a point whose ring would be cut off by the screen's edge (a corner or
@@ -131,7 +136,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
   const lit = await host.grab(roi);
   if (!lit) return { i, j, ok: false, gap: NaN, reason: 'no camera picture' };
   const guessInRoi = { x: guess.x - roi.x, y: guess.y - roi.y };
-  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, inward, outcome: { i, j, ok: false, gap: NaN } };
+  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, inward, retakes: 0, outcome: { i, j, ok: false, gap: NaN } };
   let p = { ...start };
   const finish = (outcome: AutoOutcome): AutoOutcome => {
     if (!outcome.ok && (p.x !== start.x || p.y !== start.y)) host.setPoint(i, j, start);
@@ -141,25 +146,51 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
   };
 
   /** Show the ring at a screen point and find it in the picture, looking around `expected` (roi px). */
+  /**
+   * Show the ring at a screen point and find it in the picture, looking around `expected` (roi px). The camera's
+   * picture can lag behind the screen by more than the settle time, and a frame that still shows the ring where
+   * it was last time would have the gap measured from the old place and corrected twice over: so when the ring
+   * was expected to move and is found where an earlier one was, or is not seen at all, wait and take the frame
+   * again, a few times.
+   */
+  const seen: Pt[] = []; // every ring found for this point so far, in roi px
   const seeRing = async (at: Pt, expected: Pt): Promise<RingFound | string> => {
     await host.showRing(at);
     await wait(host.settleMs);
-    const ringed = await host.grab(roi);
-    if (!ringed) return 'no camera picture';
-    diag.ringed = ringed;
-    const near = { ...expected, r: RING_REACH };
-    // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
-    const scale = localScale(h, at);
-    const expectRadius = scale * median(memory.ringScales, RING_MEAN);
-    const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
-    diag.ring = ring;
-    if (!ring) {
-      const seen = darkenedCentroid(lit, ringed, 1, 10, near);
-      return `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)`;
+    for (let take = 0; ; take++) {
+      const ringed = await host.grab(roi);
+      if (!ringed) return 'no camera picture';
+      diag.ringed = ringed;
+      const near = { ...expected, r: RING_REACH };
+      // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
+      const scale = localScale(h, at);
+      const expectRadius = scale * median(memory.ringScales, RING_MEAN);
+      const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
+      diag.ring = ring;
+      const canRetake = take < MAX_RETAKES;
+      if (!ring) {
+        // no ring at all can be the picture not having caught up with the screen yet
+        if (canRetake) {
+          diag.retakes++;
+          await wait(host.settleMs);
+          continue;
+        }
+        const seen = darkenedCentroid(lit, ringed, 1, 10, near);
+        return `the ring was not seen in the picture (${seen?.n ?? 0} pixels darkened, ${RING_PIXELS} needed)`;
+      }
+      if (ring.spread > RING_SPREAD) return `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)`;
+      // a ring found exactly where an earlier ring of this point was, when this one should be elsewhere, is the
+      // old picture: the ring at its last place, or the other stepped-in ring
+      const stale = seen.some((s) => Math.hypot(ring.x - s.x, ring.y - s.y) < STALE_STILL && Math.hypot(expected.x - s.x, expected.y - s.y) > STALE_MOVE);
+      if (stale && canRetake) {
+        diag.retakes++;
+        await wait(host.settleMs);
+        continue;
+      }
+      if (ring.radius && ring.coverage >= 0.9 && scale > 0) memory.ringScales.push(ring.radius / scale);
+      seen.push({ x: ring.x, y: ring.y });
+      return ring;
     }
-    if (ring.spread > RING_SPREAD) return `what darkened was scattered, not a ring (spread ${Math.round(ring.spread)} px, ${RING_SPREAD} at most)`;
-    if (ring.radius && ring.coverage >= 0.9 && scale > 0) memory.ringScales.push(ring.radius / scale);
-    return ring;
   };
   const inRoi = (q: Pt): Pt => {
     const c = applyHomography(h, q);
@@ -195,9 +226,9 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
       ring = { x: 2 * first.x - second.x, y: 2 * first.y - second.y };
       diag.ring = { ...first, x: ring.x, y: ring.y };
     } else {
-      const seen = await seeRing(p, expected);
-      if (typeof seen === 'string') return finish({ i, j, ok: false, gap, reason: seen });
-      ring = seen;
+      const found = await seeRing(p, expected);
+      if (typeof found === 'string') return finish({ i, j, ok: false, gap, reason: found });
+      ring = found;
     }
     const dot = dotNear(lit, ring, DOT_REACH, DOT_SCORE);
     diag.dot = dot;
