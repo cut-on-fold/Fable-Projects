@@ -174,10 +174,24 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
     if (host.stopped()) return finish({ i, j, ok: false, gap, reason: 'stopped' });
     let ring: Pt;
     if (inward) {
+      const stepped = ' (the rings for a corner or edge point are shown a step in from it, so the mat must be clear there)';
       const first = await seeRing(add(p, inward), inRoi(add(p, inward)));
-      if (typeof first === 'string') return finish({ i, j, ok: false, gap, reason: first });
+      if (typeof first === 'string') return finish({ i, j, ok: false, gap, reason: first + stepped });
       const second = await seeRing(add(p, inward, 2), inRoi(add(p, inward, 2)));
-      if (typeof second === 'string') return finish({ i, j, ok: false, gap, reason: second });
+      if (typeof second === 'string') return finish({ i, j, ok: false, gap, reason: second + stepped });
+      // Both rings must be whole, and as far apart in the picture as the map says they should be: a ring half
+      // under something on the mat gives a centre that is off, and the position worked out from the two would be
+      // off by twice as much.
+      const partial = [first, second].find((r) => r.coverage < 0.75);
+      if (partial) {
+        return finish({ i, j, ok: false, gap, reason: `a stepped-in ring was not whole (${Math.round(partial.coverage * 100)}% of it seen): something on the mat a step in from the point?` });
+      }
+      const u = { x: inRoi(add(p, inward, 2)).x - inRoi(add(p, inward)).x, y: inRoi(add(p, inward, 2)).y - inRoi(add(p, inward)).y };
+      const v = { x: second.x - first.x, y: second.y - first.y };
+      const off = Math.hypot(v.x - u.x, v.y - u.y);
+      if (off > 0.35 * Math.hypot(u.x, u.y)) {
+        return finish({ i, j, ok: false, gap, reason: `the two stepped-in rings were not where they should be relative to each other (${off.toFixed(1)} px out): something on the mat a step in from the point?` });
+      }
       ring = { x: 2 * first.x - second.x, y: 2 * first.y - second.y };
       diag.ring = { ...first, x: ring.x, y: ring.y };
     } else {
@@ -234,6 +248,10 @@ function median(values: number[], fallback: number): number {
 export async function autoCalibrate(host: AutoHost, points: Array<{ i: number; j: number }>, label: (i: number, j: number) => string): Promise<AutoOutcome[]> {
   const outcomes: AutoOutcome[] = [];
   const memory: AutoMemory = { ringScales: [] };
+  // The screen has just gone white: give the camera's exposure time to settle on it before the first frames
+  // are compared, or the first point's plain frame is brighter than its ringed ones.
+  await host.showRing(null);
+  await wait(host.settleMs * 3);
   for (let n = 0; n < points.length; n++) {
     if (host.stopped()) break;
     const { i, j } = points[n]!;

@@ -71,6 +71,13 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.9** — at a corner or edge, Auto refuses the point
+      when a stepped-in ring is not whole or the two rings are not where
+      they should be relative to each other (a tool lying over one), and
+      says that the rings are shown a step in from the point; a run waits
+      for the camera's exposure to settle on the white screen before the
+      first point; Camera frames takes exposure drift out of its darkened
+      panel.
 - [x] **Lantern v0.4.8** — a corner can be moved on its own, with the
       inner points staying where they are: Shift while dragging, or the
       Corner alone switch for drags and arrow keys; `A` on a corner moves it

@@ -111,8 +111,12 @@ centre (with less than three quarters of the ring showing, the radius is
 held at what it must be, from how the ring is drawn and the camera's
 scale there, and only the centre is fitted). For a corner or edge point,
 whose ring would be cut off by the screen, the rings are shown a step in
-from the point and two steps in, both whole, and where the ring at the
-point itself would be follows from the two. The dot is found by hue: orange paint, orange vinyl and a
+from the point and two steps in (about 3.5 and 7 cm on a 135 cm table),
+both whole, and where the ring at the point itself would be follows from
+the two. So at a corner the ring appears a little way in from the dot,
+on purpose, and the mat needs to be clear there: a tool lying over a
+stepped-in ring, or something orange or red near the dot, gets the point
+refused and left where it was, with the reason in the summary. The dot is found by hue: orange paint, orange vinyl and a
 red-orange dot count, red and pink mat lines, yellow and brown do not;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.
