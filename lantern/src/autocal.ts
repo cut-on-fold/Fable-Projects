@@ -57,6 +57,12 @@ export interface Diagnostic {
   inward: Pt | null;
   /** Frames taken again because the picture still showed the ring where it was before the point moved. */
   retakes: number;
+  /**
+   * For a corner or edge point: the ring at the point itself, as much of it as the screen shows, fitted with the
+   * size the stepped-in rings gave; `delta` is how far it sat from the straight-line guess, and `used` whether it
+   * was taken over the guess.
+   */
+  check?: { x: number; y: number; coverage: number; delta: number; used: boolean };
   outcome: AutoOutcome;
 }
 
@@ -84,6 +90,8 @@ const STEP_IN = RING_OUTER + 16; // screen px: how far in from the screen's edge
 const STALE_MOVE = 2.5; // camera px: a ring expected to move at least this far should not be found where it was
 const STALE_STILL = 1; // camera px: found this close to where it was last time counts as not having moved
 const MAX_RETAKES = 3; // frames to take again, waiting a settle each time, for a picture that lags the screen
+const DIRECT_COVERAGE = 0.4; // how much of the ring at an edge point must show for its own fit to be used
+const DIRECT_AGREE = 12; // camera px: further than this from the straight-line guess is something else, not the ring
 
 /**
  * For a point whose ring would be cut off by the screen's edge (a corner or
@@ -154,7 +162,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
    * again, a few times.
    */
   const seen: Pt[] = []; // every ring found for this point so far, in roi px
-  const seeRing = async (at: Pt, expected: Pt): Promise<RingFound | string> => {
+  const seeRing = async (at: Pt, expected: Pt, knownRadius?: number): Promise<RingFound | string> => {
     await host.showRing(at);
     await wait(host.settleMs);
     for (let take = 0; ; take++) {
@@ -164,7 +172,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
       const near = { ...expected, r: RING_REACH };
       // the ring's radius in the picture: as drawn, times the camera's scale here, corrected by rings seen whole so far
       const scale = localScale(h, at);
-      const expectRadius = scale * median(memory.ringScales, RING_MEAN);
+      const expectRadius = knownRadius ?? scale * median(memory.ringScales, RING_MEAN);
       const ring = darkenedCentroid(lit, ringed, RING_PIXELS, 10, near, expectRadius);
       diag.ring = ring;
       const canRetake = take < MAX_RETAKES;
@@ -223,7 +231,22 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
       if (off > 0.35 * Math.hypot(u.x, u.y)) {
         return finish({ i, j, ok: false, gap, reason: `the two stepped-in rings were not where they should be relative to each other (${off.toFixed(1)} px out): something on the mat a step in from the point?` });
       }
-      ring = { x: 2 * first.x - second.x, y: 2 * first.y - second.y };
+      const extrapolated = { x: 2 * first.x - second.x, y: 2 * first.y - second.y };
+      ring = extrapolated;
+      // The straight-line guess from the two rings assumes the mat is flat over those two steps; over a dip at
+      // the edge it lands short or long. The whole rings give the ring's exact size here, and with the size
+      // known the part of the ring that shows at the point itself can be fitted properly: use that when enough
+      // of it shows, and keep the guess as the fallback (a dim corner may show too little).
+      const radius = first.radius && second.radius ? (first.radius + second.radius) / 2 : null;
+      if (radius) {
+        const direct = await seeRing(p, extrapolated, radius);
+        if (typeof direct !== 'string') {
+          const delta = Math.hypot(direct.x - extrapolated.x, direct.y - extrapolated.y);
+          const used = direct.coverage >= DIRECT_COVERAGE && delta <= DIRECT_AGREE;
+          diag.check = { x: direct.x, y: direct.y, coverage: direct.coverage, delta, used };
+          if (used) ring = { x: direct.x, y: direct.y };
+        }
+      }
       diag.ring = { ...first, x: ring.x, y: ring.y };
     } else {
       const found = await seeRing(p, expected);

@@ -636,7 +636,7 @@ function saveDiagnostics(): void {
   };
   autoDiagnostics.forEach((d, row) => {
     const y = 10 + row * rowH;
-    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}${d.retakes ? ` (the picture lagged: ${d.retakes} frame${d.retakes === 1 ? '' : 's'} taken again)` : ''}`;
+    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}${d.retakes ? ` (the picture lagged: ${d.retakes} frame${d.retakes === 1 ? '' : 's'} taken again)` : ''}${d.check ? ` (the ring at the point, ${Math.round(d.check.coverage * 100)}% of it seen, sat ${d.check.delta.toFixed(1)} px from the stepped-in guess: ${d.check.used ? 'used' : 'guess kept'})` : ''}`;
     ctx.fillStyle = '#000';
     ctx.font = '13px Atkinson Hyperlegible, sans-serif';
     ctx.fillText(label, 10, y + 16);
