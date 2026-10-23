@@ -210,6 +210,20 @@ describe('autoPoint', () => {
       expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(1.5);
     }
   });
+  it('refuses a corner when something on the mat covers part of a stepped-in ring, and puts the point back', async () => {
+    const { table, points } = grid({ x: 30, y: -10 });
+    const corner = { x: 0, y: 0 };
+    table.dots.set(key(0, 0), applyHomography(real, corner));
+    points.set(key(0, 0), { x: 24, y: 18 });
+    // a tool lying over where the first stepped-in ring falls
+    const where = applyHomography(real, { x: 24 + 50, y: 18 + 50 });
+    table.dark = [{ x: Math.round(where.x) - 40, y: Math.round(where.y) - 6, w: 80, h: 30 }];
+    const start = { ...points.get(key(0, 0))! };
+    const out = await autoPoint(fake(table, points).host, 0, 0);
+    expect(out.ok).toBe(false);
+    expect(out.reason).toMatch(/not whole|relative to each other|not seen/);
+    expect(points.get(key(0, 0))).toEqual(start);
+  });
   it('steps the rings in from the screen edge only for a point whose ring would be cut off', () => {
     const screen = { w: W, h: H };
     expect(inwardStep({ x: 900, y: 500 }, screen)).toBeNull();

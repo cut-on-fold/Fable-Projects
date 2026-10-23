@@ -649,12 +649,28 @@ function saveDiagnostics(): void {
     // 3: what darkened
     const dark = { width: d.lit.width, height: d.lit.height, data: new Uint8ClampedArray(d.lit.data.length) };
     const orange = { width: d.lit.width, height: d.lit.height, data: new Uint8ClampedArray(d.lit.data.length) };
-    for (let i = 0; i < d.lit.data.length; i += 4) {
+    // the typical change over the piece is exposure drift, which the seeing takes out first; so does this picture
+    const drops = new Int16Array(d.lit.data.length / 4);
+    const hist = new Int32Array(511);
+    for (let i = 0, k = 0; i < d.lit.data.length; i += 4, k++) {
       const a = d.lit.data;
       const b = d.ringed?.data;
       const before = 0.299 * a[i]! + 0.587 * a[i + 1]! + 0.114 * a[i + 2]!;
       const after = b ? 0.299 * b[i]! + 0.587 * b[i + 1]! + 0.114 * b[i + 2]! : before;
-      const v = before - after > (d.ring?.drop ?? 10) ? 0 : 255;
+      drops[k] = Math.max(-255, Math.min(255, Math.round(before - after)));
+      hist[drops[k]! + 255]!++;
+    }
+    let drift = 0;
+    for (let b = 0, acc = 0; b < 511; b++) {
+      acc += hist[b]!;
+      if (acc * 2 >= drops.length) {
+        drift = b - 255;
+        break;
+      }
+    }
+    for (let i = 0, k = 0; i < d.lit.data.length; i += 4, k++) {
+      const a = d.lit.data;
+      const v = drops[k]! - drift > (d.ring?.drop ?? 10) ? 0 : 255;
       dark.data[i] = dark.data[i + 1] = dark.data[i + 2] = v;
       dark.data[i + 3] = 255;
       const sc = Math.min(255, orangeScore(a[i]!, a[i + 1]!, a[i + 2]!) * 1.5);
