@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.11** — at a corner or edge, Auto also looks at the
+      ring at the point itself, fitted with the exact size the stepped-in
+      rings gave, and uses that over the straight-line guess when enough
+      of it shows, since the guess assumes the mat is flat over the two
+      steps; Camera frames says how far the two disagreed.
 - [x] **Lantern v0.4.10** — Auto notices a camera frame that still shows
       the ring where it was before the point moved and takes the frame
       again, instead of measuring a gap already corrected and overshooting;

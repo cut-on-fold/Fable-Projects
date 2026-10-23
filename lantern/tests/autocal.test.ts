@@ -229,6 +229,10 @@ describe('autoPoint', () => {
     points.set(key(1, 0), { x: 930, y: 0 });
     points.set(key(0, 0), { x: 24, y: 18 });
     const f = fake(table, points);
+    const checks: Array<{ coverage: number; delta: number; used: boolean }> = [];
+    f.host.record = (d) => {
+      if (d.check) checks.push(d.check);
+    };
     for (const [i, j, truth] of [[1, 0, edge], [0, 0, corner]] as const) {
       const out = await autoPoint(f.host, i, j);
       expect(out.ok, `${i}×${j}: ${out.reason}`).toBe(true);
@@ -237,6 +241,12 @@ describe('autoPoint', () => {
       // what the loop accepts; the corner dot sits half in the unlit picture here, which shifts its measured centre
       expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(1.5);
     }
+    // the ring at the point itself was looked at too, and on this flat table agrees with the straight-line guess
+    expect(checks.length).toBeGreaterThan(0);
+    const edgeCheck = checks[0]!;
+    expect(edgeCheck.coverage).toBeGreaterThan(0.4);
+    expect(edgeCheck.delta).toBeLessThan(1.5);
+    expect(edgeCheck.used).toBe(true);
   });
   it('refuses a corner when something on the mat covers part of a stepped-in ring, and puts the point back', async () => {
     const { table, points } = grid({ x: 30, y: -10 });

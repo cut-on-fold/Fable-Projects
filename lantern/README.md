@@ -113,7 +113,11 @@ scale there, and only the centre is fitted). For a corner or edge point,
 whose ring would be cut off by the screen, the rings are shown a step in
 from the point and two steps in (about 3.5 and 7 cm on a 135 cm table),
 both whole, and where the ring at the point itself would be follows from
-the two. So at a corner the ring appears a little way in from the dot,
+the two; then, since the whole rings give the ring's exact size there,
+the part of the ring that shows at the point itself is fitted with that
+size and used when enough of it shows, because the straight-line guess
+assumes the mat is flat over those two steps and a mat that dips at the
+edge is not. So at a corner the ring appears a little way in from the dot,
 on purpose, and the mat needs to be clear there: a tool lying over a
 stepped-in ring, or something orange or red near the dot, gets the point
 refused and left where it was, with the reason in the summary. The
