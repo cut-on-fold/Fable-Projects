@@ -85,7 +85,9 @@ sets every point itself, or `A` sets the selected one and `Shift+A` all of
 them. The screen goes white and a small black ring is projected at each
 point in turn; the camera sees the ring and the dot, and the point is moved
 until the ring is centred on the dot, to about half a millimetre, usually in
-two or three goes. The tools and the camera window hide while it runs, and
+two or three goes (a point still more than a camera pixel out after eight
+goes is put back rather than kept, and no point is left on a move that
+was not looked at). The tools and the camera window hide while it runs, and
 `Esc` stops it. Setting one point with `A` moves a corner on its own, so a
 corner put right afterwards does not disturb the points already set; a full
 run moves the corners first with the inner points following, since those

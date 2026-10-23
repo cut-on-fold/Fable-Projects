@@ -71,6 +71,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.12** — Auto keeps a point only within 1 camera pixel
+      of its dot (was 1.5), stops at 0.4 (was 0.5), has eight goes instead
+      of six, and never ends on a move it has not looked at; so running a
+      point again moves it by nothing you can see.
 - [x] **Lantern v0.4.11** — at a corner or edge, Auto also looks at the
       ring at the point itself, fitted with the exact size the stepped-in
       rings gave, and uses that over the straight-line guess when enough
