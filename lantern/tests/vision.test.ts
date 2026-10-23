@@ -221,6 +221,54 @@ describe('orangeScore and dotNear', () => {
     expect(dotNear(f, { x: 60, y: 120 }, 20)).toBeNull();
     expect(dotNear(f, { x: 140, y: 95 }, 20)).not.toBeNull();
   });
+  it('puts the centre in the middle of the dot, not on its brighter side', () => {
+    const f = mat();
+    // a dot lit from the left: strong orange on the left fading to a duller orange on the right, every pixel still scoring over half the best
+    for (let y = 57; y <= 64; y++) {
+      for (let x = 57; x <= 64; x++) {
+        if (Math.hypot(x + 0.5 - 61, y + 0.5 - 61) > 3.5) continue;
+        const t = (x - 57) / 7; // 0 on the left, 1 on the right
+        set(f, x, y, [Math.round(255 - 55 * t), Math.round(150 - 30 * t), Math.round(60 + 20 * t)]);
+      }
+    }
+    expect(orangeScore(255, 150, 60)).toBeGreaterThan(1.5 * orangeScore(200, 120, 80)); // the two sides do score differently
+    expect(orangeScore(200, 120, 80)).toBeGreaterThan(orangeScore(255, 150, 60) / 2); // but both count
+    const d = dotNear(f, { x: 58, y: 58 }, 20)!;
+    expect(d).not.toBeNull();
+    expect(Math.abs(d.x - 61)).toBeLessThan(0.15);
+    expect(Math.abs(d.y - 61)).toBeLessThan(0.15);
+  });
+  it('fills in a glint bleached white inside the dot', () => {
+    const f = mat();
+    paintDisc(f, 61, 61, 3.5, ORANGE);
+    const bare = dotNear(f, { x: 58, y: 58 }, 20)!;
+    for (let y = 60; y <= 61; y++) for (let x = 61; x <= 62; x++) set(f, x, y, [255, 255, 255]); // a 2 × 2 glint, right of centre
+    const d = dotNear(f, { x: 58, y: 58 }, 20)!;
+    expect(d).not.toBeNull();
+    expect(d.n).toBe(bare.n);
+    expect(Math.abs(d.x - bare.x)).toBeLessThan(0.05);
+    expect(Math.abs(d.y - bare.y)).toBeLessThan(0.05);
+  });
+  it('is not pulled by a faint orange nearby that does not touch the dot', () => {
+    const f = mat();
+    paintDisc(f, 61, 61, 2.5, ORANGE);
+    const alone = dotNear(f, { x: 58, y: 58 }, 20)!;
+    for (let y = 58; y <= 64; y++) for (let x = 67; x <= 72; x++) set(f, x, y, [255, 205, 160]); // a pale smear, scoring but separate
+    expect(orangeScore(255, 205, 160)).toBeGreaterThan(25);
+    const d = dotNear(f, { x: 58, y: 58 }, 20)!;
+    expect(d.n).toBe(alone.n);
+    expect(Math.abs(d.x - alone.x)).toBeLessThan(0.05);
+    expect(Math.abs(d.y - alone.y)).toBeLessThan(0.05);
+  });
+  it('does not count a blank walled in by another orange as part of the dot', () => {
+    const f = mat();
+    paintDisc(f, 61, 61, 2.5, ORANGE);
+    const alone = dotNear(f, { x: 58, y: 58 }, 20)!;
+    paintDisc(f, 72, 66, 6, ORANGE, 3); // an orange ring with a blank middle, separate from the dot
+    const d = dotNear(f, { x: 58, y: 58 }, 20)!;
+    expect(d.n).toBe(alone.n);
+    expect(Math.abs(d.x - alone.x)).toBeLessThan(0.05);
+  });
 });
 
 describe('correction', () => {

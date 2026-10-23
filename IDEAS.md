@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.13** — Auto takes the dot's centre from the shape of
+      the orange patch, every pixel counting the same and a glint inside it
+      filled in, rather than an average weighted by how bright and orange
+      each pixel is; so the side the projector lights more strongly no
+      longer pulls every point a couple of millimetres the same way.
 - [x] **Lantern v0.4.12** — Auto keeps a point only within 1 camera pixel
       of its dot (was 1.5), stops at 0.4 (was 0.5), has eight goes instead
       of six, and never ends on a move it has not looked at; so running a

@@ -344,26 +344,38 @@ export function orangeScore(r: number, g: number, b: number): number {
 }
 
 export interface DotFound {
-  /** Centroid, in frame pixels, weighted by how orange each pixel is. */
+  /** The middle of the orange patch, in frame pixels: every pixel of it counts the same, however bright. */
   x: number;
   y: number;
-  /** Pixels that scored. */
+  /** Pixels in the patch, holes filled. */
   n: number;
   /** The best score seen, for the diagnostics. */
   peak: number;
-  /** How far the scoring pixels sit from the centre on average (root mean square), in pixels: a pixel or two for a dot, tens for a line. */
+  /** How far the patch's pixels sit from the centre on average (root mean square), in pixels: a pixel or two for a dot, tens for a line. */
   spread: number;
 }
 
 /**
- * The dot within `reach` of `centre`: the score-weighted centroid of the
- * pixels scoring at least `minScore` there, or null if fewer than
- * `minPixels` do. Only the pixels scoring at least half the best score
- * count, so a faint false orange (a line, a reflection) does not pull a
- * real dot's centre about; and `spread` says how big the patch found is,
- * for the caller to refuse anything but a small, compact dot. A single dot
- * is all that is expected within reach (dots are 15 cm apart and reach is
- * a few cm), so no attempt is made to tell two apart.
+ * The dot within `reach` of `centre`: the middle of the patch of orange
+ * there, or null if it has fewer than `minPixels` pixels. The patch is the
+ * run of touching pixels, each scoring at least `minScore` and at least
+ * half the best score in reach, that contains that best pixel: so a
+ * reddish mat line through the dot, scoring but well under the paint, is
+ * not part of it, and a fainter orange nearby that does not touch it
+ * cannot pull its centre about. `spread` says how big the patch is, for
+ * the caller to refuse anything but a small, compact dot. A single dot is
+ * all that is expected within reach (dots are 15 cm apart and reach is a
+ * few cm), so no attempt is made to tell two apart.
+ *
+ * The middle is the plain centroid of the patch, each pixel counting once
+ * whatever its score, with any hole inside it filled in. A dot on the mat
+ * is lit more strongly on the side facing the projector, and a glossy one
+ * can throw a white glint there; weighting pixels by how bright and orange
+ * they are, or dropping the ones a glint has bleached, pulls the measured
+ * centre towards that side by a pixel or so, which on the mat is a couple
+ * of millimetres, the same way at every point. The shape of the patch does
+ * not move with the light. (A side of the dot so dull it scores under half
+ * the best is still left out, as a line would be.)
  */
 export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 25, minPixels = 2): DotFound | null {
   const { width: w, height: h, data } = frame;
@@ -371,42 +383,100 @@ export function dotNear(frame: Frame, centre: Pt, reach: number, minScore = 25, 
   const x1 = Math.min(w - 1, Math.ceil(centre.x + reach));
   const y0 = Math.max(0, Math.floor(centre.y - reach));
   const y1 = Math.min(h - 1, Math.ceil(centre.y + reach));
-  const scores = new Float32Array((x1 - x0 + 1) * (y1 - y0 + 1));
+  const cols = x1 - x0 + 1;
+  const rows = y1 - y0 + 1;
+  if (cols <= 0 || rows <= 0) return null;
+  // 0 outside reach or under the score, 1 orange, 2 in the dot's patch, 3 blank but reachable from the window's edge,
+  // 4 a hole in the dot's patch, 5 blank but walled in by some other orange
+  const cell = new Uint8Array(cols * rows);
+  const scores = new Float32Array(cols * rows);
   let peak = 0;
+  let top = -1;
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       if (Math.hypot(x + 0.5 - centre.x, y + 0.5 - centre.y) > reach) continue;
       const i = (y * w + x) * 4;
       const sc = orangeScore(data[i]!, data[i + 1]!, data[i + 2]!);
-      scores[(y - y0) * (x1 - x0 + 1) + (x - x0)] = sc;
-      if (sc > peak) peak = sc;
+      const k = (y - y0) * cols + (x - x0);
+      scores[k] = sc;
+      if (sc > peak) {
+        peak = sc;
+        top = k;
+      }
     }
   }
+  if (top < 0 || peak < minScore) return null;
+  // only pixels at least half as orange as the best count, so a reddish mat line through the dot is not part of it
   const threshold = Math.max(minScore, peak / 2);
+  for (let k = 0; k < cell.length; k++) if (scores[k]! >= threshold) cell[k] = 1;
+  // Flood from `start` over touching cells valued `from`, setting them to `to`; true if the flood touched a cell valued `edge`.
+  const fill = (start: number, from: number, to: number, edge: number): boolean => {
+    const stack = [start];
+    cell[start] = to;
+    let touched = false;
+    while (stack.length) {
+      const k = stack.pop()!;
+      const kx = k % cols;
+      const ky = (k - kx) / cols;
+      const step = (nx: number, ny: number) => {
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) return;
+        const nk = ny * cols + nx;
+        const c = cell[nk];
+        if (c === edge) touched = true;
+        if (c !== from) return;
+        cell[nk] = to;
+        stack.push(nk);
+      };
+      step(kx - 1, ky);
+      step(kx + 1, ky);
+      step(kx, ky - 1);
+      step(kx, ky + 1);
+    }
+    return touched;
+  };
+  // grow the patch from the most orange pixel over touching orange pixels
+  fill(top, 1, 2, -1);
+  // blank cells that can be reached from the window's edge are outside the patch
+  for (let x = 0; x < cols; x++) {
+    if (cell[x] === 0) fill(x, 0, 3, -1);
+    const k = (rows - 1) * cols + x;
+    if (cell[k] === 0) fill(k, 0, 3, -1);
+  }
+  for (let y = 0; y < rows; y++) {
+    const l = y * cols;
+    if (cell[l] === 0) fill(l, 0, 3, -1);
+    const r = l + cols - 1;
+    if (cell[r] === 0) fill(r, 0, 3, -1);
+  }
+  // what is left blank is walled in: a hole in the dot's patch if only the patch walls it, else someone else's
+  for (let k = 0; k < cell.length; k++) {
+    if (cell[k] === 0) {
+      const other = fill(k, 0, 4, 1);
+      if (other) fill(k, 4, 5, -1);
+    }
+  }
   let sx = 0;
   let sy = 0;
   let sxx = 0;
   let syy = 0;
-  let sw = 0;
   let n = 0;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const sc = scores[(y - y0) * (x1 - x0 + 1) + (x - x0)]!;
-      if (sc < threshold) continue;
-      const px = x + 0.5;
-      const py = y + 0.5;
-      sx += px * sc;
-      sy += py * sc;
-      sxx += px * px * sc;
-      syy += py * py * sc;
-      sw += sc;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const c = cell[y * cols + x];
+      if (c !== 2 && c !== 4) continue; // the patch, and the holes in it
+      const px = x0 + x + 0.5;
+      const py = y0 + y + 0.5;
+      sx += px;
+      sy += py;
+      sxx += px * px;
+      syy += py * py;
       n++;
     }
   }
   if (n < minPixels) return null;
-  const cx = sx / sw;
-  const cy = sy / sw;
-  const spread = Math.sqrt(Math.max(0, (sxx + syy) / sw - cx * cx - cy * cy));
+  const cx = sx / n;
+  const cy = sy / n;
+  const spread = Math.sqrt(Math.max(0, (sxx + syy) / n - cx * cx - cy * cy));
   return { x: cx, y: cy, n, peak, spread };
 }
 
