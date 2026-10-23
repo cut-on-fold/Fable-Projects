@@ -250,6 +250,18 @@ export function withPoint(mesh: Mesh, i: number, j: number, p: Pt): Mesh {
   };
 }
 
+/**
+ * Move one point and nothing else: a corner moved this way leaves every
+ * other point exactly where it is on the screen, so a corner that is out
+ * can be put right after the inner points have been set without moving
+ * them. (For an inner point this is the same as withPoint.)
+ */
+export function withPointAlone(mesh: Mesh, i: number, j: number, p: Pt): Mesh {
+  const points = mesh.points.slice();
+  points[pointIndex(mesh, i, j)] = { x: p.x, y: p.y };
+  return { ...mesh, points };
+}
+
 /** Back to the four corners: the inner points are forgotten. */
 export function resetToCorners(mesh: Mesh): Mesh {
   return meshFromCorners(mesh.width, mesh.height, corners(mesh));

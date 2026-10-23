@@ -127,6 +127,24 @@ async function run(name, { dark }) {
   const moved = s.calibrations[0].mesh.points[0];
   if (Math.round(moved.x - tl.x) !== 16 || Math.round(moved.y - tl.y) !== 35) errors.push(`${name}: corner drag gave ${JSON.stringify(moved)} from ${JSON.stringify(tl)}`);
   if (s.calibrations[0].mesh.points.length !== 12 || s.calibrations[0].mesh.xs.join() !== '0,30,60,90') errors.push(`${name}: stored mesh ${JSON.stringify(s.calibrations[0].mesh.xs)} ${s.calibrations[0].mesh.points.length} points`);
+  // Shift while dragging a corner moves it alone: the inner point next to it stays put; a plain drag takes it along
+  {
+    const inner = s.calibrations[0].mesh.points[5]; // (1, 1)
+    await page.keyboard.press('h');
+    await page.keyboard.down('Shift');
+    await page.mouse.move(moved.x, moved.y);
+    await page.mouse.down();
+    await page.mouse.move(moved.x - 20, moved.y - 10, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.up('Shift');
+    await page.keyboard.press('h');
+    await page.waitForTimeout(250);
+    s = await stored();
+    const after = s.calibrations[0].mesh.points;
+    if (Math.round(after[0].x - moved.x) !== -20 || Math.round(after[0].y - moved.y) !== -10) errors.push(`${name}: shift-drag of the corner gave ${JSON.stringify(after[0])}`);
+    if (Math.abs(after[5].x - inner.x) > 0.01 || Math.abs(after[5].y - inner.y) > 0.01) errors.push(`${name}: shift-drag of the corner moved the inner point ${JSON.stringify(inner)} → ${JSON.stringify(after[5])}`);
+    if ((await page.getAttribute('#corner-alone', 'aria-pressed')) !== 'false') errors.push(`${name}: Corner alone should start off`);
+  }
   // the inner point sits where the corners' homography puts it: on the (bent) top edge between the corners
   await page.screenshot({ path: join(SHOTS, `${name}-calibrate.png`) });
 

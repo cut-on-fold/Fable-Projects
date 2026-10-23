@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyHomography, rectCorners, type Pt } from '../src/calc/homography';
 import {
   cellLines, cols, cornerHomography, foldedCells, gridLines, isCornersOnly, meshFromCorners, nearestPoint, parseMesh, pixelsPerCm, pointAt, resample,
-  resetToCorners, rows, screenToTable, spacing, stops, tablePointAt, tableToScreen, triangulate, withPoint, withSize, withSpacing, type Mesh,
+  resetToCorners, rows, screenToTable, spacing, stops, tablePointAt, tableToScreen, triangulate, withPoint, withPointAlone, withSize, withSpacing, type Mesh,
 } from '../src/calc/mesh';
 
 const close = (a: Pt, b: Pt, digits = 5) => {
@@ -128,6 +128,26 @@ describe('a bent mesh', () => {
   it('averages the pixels per centimetre', () => {
     expect(pixelsPerCm(flat())).toBeCloseTo(10);
     expect(pixelsPerCm(withSpacing(flat(), 30))).toBeCloseTo(10);
+  });
+  it('moves a corner with the inner points following, or alone with them staying put', () => {
+    const m = dipped();
+    const before = m.points.map((p) => ({ ...p }));
+    const c = cols(m);
+    const r = rows(m);
+    const corner = pointAt(m, c, r);
+    const moved = { x: corner.x + 40, y: corner.y - 30 };
+    const following = withPoint(m, c, r, moved);
+    close(pointAt(following, c, r), moved);
+    // the inner points near that corner go with it, keeping their nudges
+    const near = pointAt(following, c - 1, r - 1);
+    expect(Math.hypot(near.x - before[c - 1 + (r - 1) * (c + 1)]!.x, near.y - before[c - 1 + (r - 1) * (c + 1)]!.y)).toBeGreaterThan(5);
+    const alone = withPointAlone(m, c, r, moved);
+    close(pointAt(alone, c, r), moved);
+    alone.points.forEach((p, k) => {
+      if (k !== c + r * (c + 1)) close(p, before[k]!);
+    });
+    // an inner point moved alone is just moved
+    close(pointAt(withPointAlone(m, 1, 1, { x: 300, y: 300 }), 1, 1), { x: 300, y: 300 });
   });
 });
 

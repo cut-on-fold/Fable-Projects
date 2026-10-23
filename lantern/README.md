@@ -32,8 +32,11 @@ is labelled with, so the picture bends to follow the surface.
    next one down the column (`[` and `]` go back and forth). Every circle has a
    clear centre with nothing drawn over it, so a dot painted on the mat
    crossing shows in the middle; the selected one is bigger, in the chalk
-   colour, with long arms pointing in at the dot. **Corners only** forgets
-   the inner points.
+   colour, with long arms pointing in at the dot. A corner takes the inner
+   points with it when it moves, which is right while the grid is being set
+   up; once the inner points are on their dots, hold Shift while dragging a
+   corner, or turn on **Corner alone**, and the corner moves on its own with
+   everything else staying put. **Corners only** forgets the inner points.
 3. **Project**: open a PDF or SVG, drag it into place, turn it (`R` for 90°,
    `,` and `.` for 1°), flip it (`F` across, `V` down), invert for white lines
    on black (`I`), thicken the lines, pick the size layer, hide the tools
@@ -83,7 +86,10 @@ them. The screen goes white and a small black ring is projected at each
 point in turn; the camera sees the ring and the dot, and the point is moved
 until the ring is centred on the dot, to about half a millimetre, usually in
 two or three goes. The tools and the camera window hide while it runs, and
-`Esc` stops it. A point it cannot set is put back exactly where it was and
+`Esc` stops it. Setting one point with `A` moves a corner on its own, so a
+corner put right afterwards does not disturb the points already set; a full
+run moves the corners first with the inner points following, since those
+are about to be set anyway. A point it cannot set is put back exactly where it was and
 listed at the end, with the reason and the numbers behind it: the dot
 under the laptop or a tool, the ring not seen, the orange it found being a
 line or a smear rather than a small dot (a red mat line can look orange to
