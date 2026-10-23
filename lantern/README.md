@@ -116,7 +116,12 @@ both whole, and where the ring at the point itself would be follows from
 the two. So at a corner the ring appears a little way in from the dot,
 on purpose, and the mat needs to be clear there: a tool lying over a
 stepped-in ring, or something orange or red near the dot, gets the point
-refused and left where it was, with the reason in the summary. The dot is found by hue: orange paint, orange vinyl and a
+refused and left where it was, with the reason in the summary. The
+camera's picture can lag the screen by more than the wait between moving
+a point and looking, so when a ring that should have moved is found where
+it was, the frame is taken again rather than trusted; Camera frames says
+when that happened. While it runs, nothing but the ring is on the screen:
+no tools, no Show tools button, no pointer. The dot is found by hue: orange paint, orange vinyl and a
 red-orange dot count, red and pink mat lines, yellow and brown do not;
 `tests/autocal.test.ts` runs the whole loop against a pretend table and
 camera.

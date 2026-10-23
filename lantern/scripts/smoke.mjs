@@ -211,6 +211,7 @@ async function run(name, { dark }) {
   await page.click('#auto');
   await page.waitForTimeout(300);
   if (!(await page.isHidden('#bar'))) errors.push(`${name}: tools not hidden while Auto runs`);
+  if (!(await page.isHidden('#peek'))) errors.push(`${name}: Show tools button not hidden while Auto runs`);
   await page.waitForFunction(() => /points set from the camera|Nothing was set/.test(document.getElementById('hint')?.textContent ?? ''), null, { timeout: 60000 }).catch(() => errors.push(`${name}: Auto did not finish`));
   const summary = await page.textContent('#hint');
   if (!/0 of 12 points set/.test(summary)) errors.push(`${name}: Auto summary: ${summary}`);
