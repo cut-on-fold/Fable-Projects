@@ -111,7 +111,13 @@ to frame; and it fits a circle to what it sees, so a corner or edge point
 whose ring is cut off by the screen's edge still gets the ring's true
 centre (with less than three quarters of the ring showing, the radius is
 held at what it must be, from how the ring is drawn and the camera's
-scale there, and only the centre is fitted). For a corner or edge point,
+scale there, and only the centre is fitted). The circle goes through the
+ring's darkest line, not through every darkened pixel weighted by how
+dark: the mat glows, carrying the projector's light a little way through
+it away from the projector, so the dark ring is filled in on the side
+facing the projector, and a weighted measure leans away from the
+projector by a pixel or so, which left every handle a millimetre or two
+towards the projector of its dot. The darkest line hardly moves. For a corner or edge point,
 whose ring would be cut off by the screen, the rings are shown a step in
 from the point and two steps in (about 3.5 and 7 cm on a 135 cm table),
 both whole, and where the ring at the point itself would be follows from
