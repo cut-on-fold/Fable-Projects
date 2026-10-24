@@ -141,6 +141,7 @@ function fake(table: Table, points: Map<string, Pt>, map: Mat3 = clicked, lag = 
     setPoint: (i, j, p) => {
       points.set(key(i, j), p);
     },
+    neighbours: (i, j) => [key(i - 1, j), key(i + 1, j), key(i, j - 1), key(i, j + 1)].map((k) => points.get(k)).filter((p): p is Pt => !!p),
     settleMs: 0,
     progress: (t) => {
       progress.push(t);
@@ -184,6 +185,41 @@ describe('autoPoint', () => {
     const dot = table.dots.get(key(1, 1))!;
     expect(Math.hypot(landed.x - dot.x, landed.y - dot.y)).toBeLessThan(1);
     expect(f.progress.length).toBeLessThanOrEqual(4);
+  });
+  it('takes the dot nearest the ring, not a neighbour, when the corners put the ring most of a cell out', async () => {
+    // dots every 150 screen px (about 56 picture px, as 15 cm on a big mat seen by a wide lens), and a map that
+    // is out by two thirds of that: corners clicked a little off, or a lens that bends the picture
+    const dots = new Map<string, Pt>();
+    const points = new Map<string, Pt>();
+    const xs = new Set<number>();
+    const ys = new Set<number>();
+    for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < 3; i++) {
+        const t = { x: 600 + i * 150, y: 300 + j * 150 };
+        const d = applyHomography(real, t);
+        dots.set(key(i, j), d);
+        points.set(key(i, j), { x: t.x + 6, y: t.y - 4 });
+        xs.add(d.x);
+        ys.add(d.y);
+      }
+    }
+    const table: Table = { dots, lines: { xs: [...xs], ys: [...ys] }, black: 0.9 };
+    const rough = homographyFromPoints(rectCorners(W, H), [{ x: 158, y: 90 }, { x: 878, y: 105 }, { x: 863, y: 630 }, { x: 173, y: 615 }])!; // the clicked map, 38 px to the right
+    const f = fake(table, points, rough);
+    let reach = Infinity;
+    f.host.record = (d) => {
+      reach = d.reach;
+    };
+    const out = await autoPoint(f.host, 1, 1);
+    expect(out.ok, out.reason).toBe(true);
+    const landed = applyHomography(real, points.get(key(1, 1))!);
+    const own = dots.get(key(1, 1))!;
+    expect(Math.hypot(landed.x - own.x, landed.y - own.y)).toBeLessThan(1);
+    expect(reach).toBeLessThan(30); // under half the 56 px between dots, so the neighbour at 56 px was never in reach
+    expect(out.mapOff).toBeGreaterThan(30);
+    expect(out.mapOff).toBeLessThan(50);
+    expect(summarise([out], label)).toMatch(/rough/);
+    expect(summarise([{ ...out, mapOff: 4 }], label)).not.toMatch(/rough/);
   });
   it('waits for a camera picture that lags the screen, instead of correcting twice and overshooting', async () => {
     const { table, points } = grid({ x: 36, y: -28 });

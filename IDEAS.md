@@ -71,6 +71,12 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.14** — Auto never looks for the dot further from the
+      ring than a share of the gap between neighbouring dots, so a camera
+      map out by most of a cell (corners clicked a crossing out, a lens
+      that bends the picture) can no longer move a point to a neighbour's
+      dot; the summary says when the map is that rough, and Camera frames
+      shows how far each ring appeared from where the corners put it.
 - [x] **Lantern v0.4.13** — Auto takes the dot's centre from the shape of
       the orange patch, every pixel counting the same and a glint inside it
       filled in, rather than an average weighted by how bright and orange

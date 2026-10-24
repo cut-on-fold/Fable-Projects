@@ -574,6 +574,15 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
       await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     },
     getPoint: (i, j) => pointAt(mesh(), i, j),
+    neighbours: (i, j) => {
+      const m = mesh();
+      const out: Pt[] = [];
+      if (i > 0) out.push(pointAt(m, i - 1, j));
+      if (i < cols(m)) out.push(pointAt(m, i + 1, j));
+      if (j > 0) out.push(pointAt(m, i, j - 1));
+      if (j < rows(m)) out.push(pointAt(m, i, j + 1));
+      return out;
+    },
     // Setting one point, or with Corner alone on, a corner moves on its own; in a full run the corners come first
     // and the inner points follow them to roughly the right places before being set themselves.
     setPoint: (i, j, p) => setMesh((points.length === 1 || state.cornersAlone ? withPointAlone : withPoint)(mesh(), i, j, p)),
@@ -636,7 +645,7 @@ function saveDiagnostics(): void {
   };
   autoDiagnostics.forEach((d, row) => {
     const y = 10 + row * rowH;
-    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}${d.retakes ? ` (the picture lagged: ${d.retakes} frame${d.retakes === 1 ? '' : 's'} taken again)` : ''}${d.check ? ` (the ring at the point, ${Math.round(d.check.coverage * 100)}% of it seen, sat ${d.check.delta.toFixed(1)} px from the stepped-in guess: ${d.check.used ? 'used' : 'guess kept'})` : ''}`;
+    const label = `${coords(tablePointAt(mesh(), d.i, d.j))}: ${d.outcome.ok ? `set, ${d.outcome.gap.toFixed(1)} px off` : d.outcome.reason ?? 'not set'}${d.retakes ? ` (the picture lagged: ${d.retakes} frame${d.retakes === 1 ? '' : 's'} taken again)` : ''}${d.check ? ` (the ring at the point, ${Math.round(d.check.coverage * 100)}% of it seen, sat ${d.check.delta.toFixed(1)} px from the stepped-in guess: ${d.check.used ? 'used' : 'guess kept'})` : ''}${d.mapOff !== undefined && d.mapOff > 5 ? ` (the first ring appeared ${Math.round(d.mapOff)} px from where the corners said; the dot was looked for within ${Math.round(d.reach)} px of the ring)` : ''}`;
     ctx.fillStyle = '#000';
     ctx.font = '13px Atkinson Hyperlegible, sans-serif';
     ctx.fillText(label, 10, y + 16);
