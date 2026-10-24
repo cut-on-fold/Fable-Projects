@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyHomography, homographyFromPoints, invert, rectCorners, type Mat3, type Pt } from '../src/calc/homography';
-import { blankFrame, localScale, paintDisc, type Frame } from '../src/calc/vision';
+import { blankFrame, darkenedCentroid, localScale, luma, paintDisc, type Frame } from '../src/calc/vision';
 import { autoCalibrate, autoPoint, inwardStep, RING_INNER, RING_OUTER, summarise, type AutoHost, type AutoOutcome } from '../src/autocal';
 
 // A pretend table seen by a pretend camera: a white mat with reddish lines through every dot, orange dots,
@@ -29,6 +29,12 @@ interface Table {
   dark?: Array<{ x: number; y: number; w: number; h: number }>;
   /** Which picture pixels the projector lights (inside the screen), worked out once. */
   screen?: Uint8Array;
+  /**
+   * The mat glows: light travels this many picture pixels through it in direction (dx, dy), away from the
+   * projector, before coming back out, carrying `share` of the brightness with it. So a dark ring is filled in
+   * on the side facing the projector and trails a shadow on the other.
+   */
+  glow?: { dx: number; dy: number; length: number; share: number };
 }
 
 /** Whether each picture pixel is inside the projected screen; beyond it the mat is only in room light and no ring shows. */
@@ -74,14 +80,40 @@ function picture(table: Table, ring: Pt | null, seed: number): Frame {
     const scale = localScale(real, ring);
     const outer = RING_OUTER * scale;
     const inner = RING_INNER * scale;
-    for (let y = Math.floor(c.y - outer); y <= Math.ceil(c.y + outer); y++) {
-      for (let x = Math.floor(c.x - outer); x <= Math.ceil(c.x + outer); x++) {
-        if (x < 0 || y < 0 || x >= PIC.w || y >= PIC.h) continue;
+    // how dark the projector makes each pixel, 0 to 1, before the mat's glow spreads it
+    const x0 = Math.max(0, Math.floor(c.x - outer) - 20);
+    const y0 = Math.max(0, Math.floor(c.y - outer) - 20);
+    const x1 = Math.min(PIC.w - 1, Math.ceil(c.x + outer) + 20);
+    const y1 = Math.min(PIC.h - 1, Math.ceil(c.y + outer) + 20);
+    const cols = x1 - x0 + 1;
+    const dark = new Float32Array(cols * (y1 - y0 + 1));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
         if (!lit[y * PIC.w + x]) continue; // the screen ends here
         const d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y);
         if (d > outer || d < inner) continue;
+        dark[(y - y0) * cols + (x - x0)] = 1;
+      }
+    }
+    const g = table.glow;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!lit[y * PIC.w + x]) continue;
+        let v = dark[(y - y0) * cols + (x - x0)]!;
+        if (g) {
+          // what this pixel shows is partly what the light brought from upstream, towards the projector
+          let up = 0;
+          for (let s = 1; s <= g.length; s++) {
+            const ux = Math.round(x - g.dx * s) - x0;
+            const uy = Math.round(y - g.dy * s) - y0;
+            if (ux >= 0 && uy >= 0 && ux < cols && uy <= y1 - y0) up += dark[uy * cols + ux]!;
+          }
+          v = (1 - g.share) * v + (g.share * up) / g.length;
+        }
+        if (v <= 0) continue;
         const i = (y * PIC.w + x) * 4;
-        for (let k = 0; k < 3; k++) f.data[i + k] = Math.round(f.data[i + k]! * table.black);
+        const factor = 1 - v * (1 - table.black);
+        for (let k = 0; k < 3; k++) f.data[i + k] = Math.round(f.data[i + k]! * factor);
       }
     }
   }
@@ -220,6 +252,51 @@ describe('autoPoint', () => {
     expect(out.mapOff).toBeLessThan(50);
     expect(summarise([out], label)).toMatch(/rough/);
     expect(summarise([{ ...out, mapOff: 4 }], label)).not.toMatch(/rough/);
+  });
+  it('finds the ring where it is when the mat glows one way, where every darkened pixel would lean', () => {
+    // the projector is beyond the top of the table: its light travels down the picture through the mat
+    const { table, truth } = grid({ x: 0, y: 0 });
+    table.glow = { dx: 0, dy: 1, length: 6, share: 0.5 };
+    const at = truth.get(key(1, 1))!;
+    const centre = applyHomography(real, at);
+    const lit = picture(table, null, 1);
+    const ringed = picture(table, at, 2);
+    const found = darkenedCentroid(lit, ringed, 30, 10, { x: centre.x + 3, y: centre.y - 2, r: 60 })!;
+    expect(found).not.toBeNull();
+    // every darkened pixel weighted by how dark, the old way, leans down the picture, away from the projector
+    let sx = 0;
+    let sy = 0;
+    let sw = 0;
+    for (let y = 0; y < PIC.h; y++) {
+      for (let x = 0; x < PIC.w; x++) {
+        if (Math.hypot(x + 0.5 - centre.x, y + 0.5 - centre.y) > 40) continue;
+        const i = (y * PIC.w + x) * 4;
+        const d = luma(lit.data[i]!, lit.data[i + 1]!, lit.data[i + 2]!) - luma(ringed.data[i]!, ringed.data[i + 1]!, ringed.data[i + 2]!);
+        if (d <= found.drop) continue;
+        sx += (x + 0.5) * d;
+        sy += (y + 0.5) * d;
+        sw += d;
+      }
+    }
+    const lean = { x: sx / sw - centre.x, y: sy / sw - centre.y };
+    expect(lean.y).toBeGreaterThan(0.7);
+    expect(Math.abs(lean.x)).toBeLessThan(0.3);
+    // the darkest line of the ring stays put
+    expect(Math.abs(found.x - centre.x)).toBeLessThan(0.25);
+    expect(Math.abs(found.y - centre.y)).toBeLessThan(0.25);
+    expect(found.coverage).toBeGreaterThan(0.9);
+  });
+  it('lands on the dot, not a glow-width short of it, when the mat glows', async () => {
+    const { table, points } = grid({ x: 30, y: -24 });
+    table.glow = { dx: 0, dy: 1, length: 6, share: 0.5 };
+    const f = fake(table, points);
+    for (const [i, j] of [[1, 1], [0, 1]] as const) {
+      const out = await autoPoint(f.host, i, j);
+      expect(out.ok, out.reason).toBe(true);
+      const landed = applyHomography(real, points.get(key(i, j))!);
+      const dot = table.dots.get(key(i, j))!;
+      expect(Math.hypot(landed.x - dot.x, landed.y - dot.y), `${i}×${j}`).toBeLessThan(0.5);
+    }
   });
   it('waits for a camera picture that lags the screen, instead of correcting twice and overshooting', async () => {
     const { table, points } = grid({ x: 36, y: -28 });

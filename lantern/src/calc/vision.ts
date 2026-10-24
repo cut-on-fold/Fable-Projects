@@ -189,8 +189,124 @@ export function darkenedCentroid(lit: Frame, ringed: Frame, minPixels = 30, floo
   // A ring cut off by the screen's edge (a corner point) or by the mat's edge has its centroid pulled towards
   // the part that shows; a circle fitted to the pixels has its centre in the right place from any arc.
   const circle = fitCircle(xs, ys, ws, n, cx, cy, r === Infinity ? Math.min(w, lit.height) / 2 : r, expectRadius);
-  if (circle) return { x: circle.x, y: circle.y, n, drop, peak, spread, radius: circle.radius, coverage: circle.coverage };
-  return { x: cx, y: cy, n, drop, peak, spread, radius: null, coverage: 0 };
+  if (!circle) return { x: cx, y: cy, n, drop, peak, spread, radius: null, coverage: 0 };
+  // The mat glows: the projector's light travels a little way through it before coming back out, away from the
+  // projector, so the dark ring is filled in on the side facing the projector and trails a shadow on the other.
+  // Every darkened pixel, weighted by how dark, then leans away from the projector by a pixel or so, which on
+  // the mat is a millimetre or two. The glow is a slow slope laid over the ring; the ring's own two edges are
+  // still the sharpest changes in the picture and stay where they are, so the circle is refitted to them.
+  const h = lit.height;
+  const sample = (x: number, y: number): number | null => {
+    // bilinear, over pixel centres; null where any corner is off the lit mat or out of reach
+    const x0 = Math.floor(x - 0.5);
+    const y0 = Math.floor(y - 0.5);
+    if (x0 < 0 || y0 < 0 || x0 + 1 >= w || y0 + 1 >= h) return null;
+    const fx = x - 0.5 - x0;
+    const fy = y - 0.5 - y0;
+    let v = 0;
+    for (const [dx, dy, wt] of [
+      [0, 0, (1 - fx) * (1 - fy)],
+      [1, 0, fx * (1 - fy)],
+      [0, 1, (1 - fx) * fy],
+      [1, 1, fx * fy],
+    ] as const) {
+      const k = (y0 + dy) * w + x0 + dx;
+      if (!counts(k)) return null;
+      v += wt * (drops[k]! - drift);
+    }
+    return v;
+  };
+  const edged = edgeCircle(sample, circle, drop, expectRadius);
+  return { x: edged.x, y: edged.y, n, drop, peak, spread, radius: edged.radius, coverage: circle.coverage };
+}
+
+/**
+ * The circle through the middle of the ring's two edges. From the centre
+ * of `circle`, along every 5°, the darkening is sampled across the ring;
+ * the ring's inner edge is where it climbs steepest going outward and the
+ * outer edge where it falls steepest, each to a fraction of a pixel from
+ * the curve through the steepest step and its neighbours, and the point
+ * midway between the two is the ring's middle there. A circle is fitted
+ * to those points, the radius held at `expectRadius` as in `fitCircle`
+ * when under three quarters of the ring shows. A direction without two
+ * clear edges (the ring cut off there, under something, or too faint)
+ * gives no point; with too few points the circle given is returned as it
+ * was. The glow a translucent mat adds is a slow slope across the ring
+ * and a tail beyond it, far gentler than the ring's own edges, so it
+ * leaves them where they are while it pulls any weighted average about.
+ */
+function edgeCircle(
+  sample: (x: number, y: number) => number | null,
+  circle: { x: number; y: number; radius: number; coverage: number },
+  drop: number,
+  expectRadius?: number,
+): { x: number; y: number; radius: number; coverage: number } {
+  const steps = 72;
+  const xs = new Float64Array(steps);
+  const ys = new Float64Array(steps);
+  const ws = new Float64Array(steps);
+  let n = 0;
+  const { radius } = circle;
+  const from = radius * 0.5;
+  const step = 0.5;
+  const count = Math.round(radius / step) + 1; // out to 1.5 radii
+  const steep = drop / 2; // per pixel: an edge must climb at least this much, a glow's slope never does
+  /** Where the slope through `i` peaks, to a fraction of a step, by the parabola through its neighbours. */
+  const peakAt = (g: Float64Array, i: number): number => {
+    const a = g[i - 1];
+    const b = g[i];
+    const c = g[i + 1];
+    if (a === undefined || c === undefined || !Number.isFinite(a) || !Number.isFinite(c)) return i;
+    const denom = a - 2 * b! + c;
+    return denom < 0 ? i + (a - c) / (2 * denom) : i;
+  };
+  const profile = new Float64Array(count);
+  const slope = new Float64Array(count);
+  for (let s = 0; s < steps; s++) {
+    const angle = (s / steps) * 2 * Math.PI;
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    for (let i = 0; i < count; i++) {
+      const d = from + i * step;
+      profile[i] = sample(circle.x + ux * d, circle.y + uy * d) ?? NaN;
+    }
+    // the slope going outward, per pixel, over half a pixel either side: a short span, so a glow's gentle slope
+    // or tail beside an edge does not lean on where the edge is found
+    slope.fill(NaN);
+    for (let i = 1; i < count - 1; i++) slope[i] = (profile[i + 1]! - profile[i - 1]!) / (2 * step);
+    // the inner edge climbs (into the ring), inside the circle's radius; the outer edge falls, outside it
+    const mid = Math.round((radius - from) / step);
+    let inner = -1;
+    let outer = -1;
+    for (let i = 2; i < count - 2; i++) {
+      const g = slope[i]!;
+      if (!Number.isFinite(g)) continue;
+      if (i <= mid && g >= steep && (inner < 0 || g > slope[inner]!)) inner = i;
+      if (i >= mid && -g >= steep && (outer < 0 || g < slope[outer]!)) outer = i;
+    }
+    if (inner < 0 || outer < 0) continue;
+    const dIn = from + peakAt(slope, inner) * step;
+    const dOut = from + peakAt(slope, outer) * step;
+    if (dOut - dIn < step * 2) continue;
+    const d = (dIn + dOut) / 2;
+    xs[n] = circle.x + ux * d;
+    ys[n] = circle.y + uy * d;
+    ws[n] = 1;
+    n++;
+  }
+  if (n < 8) return circle;
+  const c = { a: circle.x, b: circle.y, rad: radius };
+  const fixed = n / steps < 0.75 && expectRadius !== undefined && expectRadius > 0;
+  if (fixed) c.rad = expectRadius;
+  let keep: (k: number) => boolean = () => true;
+  if (!refine(xs, ys, ws, n, keep, c, fixed)) return circle;
+  // once more without any point far from the circle (a speck, or where the ring is cut off)
+  keep = (k) => Math.abs(Math.hypot(xs[k]! - c.a, ys[k]! - c.b) - c.rad) <= 0.15 * c.rad;
+  let kept = 0;
+  for (let k = 0; k < n; k++) if (keep(k)) kept++;
+  if (kept < 8 || !refine(xs, ys, ws, n, keep, c, fixed)) return circle;
+  if (!Number.isFinite(c.a) || !Number.isFinite(c.b) || Math.hypot(c.a - circle.x, c.b - circle.y) > radius) return circle;
+  return { x: c.a, y: c.b, radius: c.rad, coverage: circle.coverage };
 }
 
 /** The camera's scale at a screen point: camera pixels per screen pixel, from the slope of the map there. */

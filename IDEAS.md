@@ -71,6 +71,14 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.15** — Auto measures the projected ring by its darkest
+      line rather than by every darkened pixel weighted by how dark. The
+      mat glows: the projector's light travels a little way through it
+      away from the projector, filling the dark ring in on the side facing
+      the projector, and the weighted measure leaned away from the
+      projector by a pixel or so, which left every handle a millimetre or
+      two towards the projector of its dot, more so far from it. The
+      darkest line hardly moves.
 - [x] **Lantern v0.4.14** — Auto never looks for the dot further from the
       ring than a share of the gap between neighbouring dots, so a camera
       map out by most of a cell (corners clicked a crossing out, a lens
