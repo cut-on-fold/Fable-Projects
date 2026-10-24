@@ -32,6 +32,8 @@ export interface AutoHost {
   showRing(p: Pt | null): Promise<void>;
   getPoint(i: number, j: number): Pt;
   setPoint(i: number, j: number, p: Pt): void;
+  /** The screen points next to this one along its row and column (up to four), so the dots' spacing is known. */
+  neighbours(i: number, j: number): Pt[];
   /** How long the camera takes to show a change, in ms. */
   settleMs: number;
   progress(text: string): void;
@@ -63,6 +65,10 @@ export interface Diagnostic {
    * was taken over the guess.
    */
   check?: { x: number; y: number; coverage: number; delta: number; used: boolean };
+  /** How far the first ring appeared from where the corners said it would, in camera px: how good the map is. */
+  mapOff?: number;
+  /** How far from the ring the dot was looked for, in camera px. */
+  reach: number;
   outcome: AutoOutcome;
 }
 
@@ -73,10 +79,14 @@ export interface AutoOutcome {
   /** Camera pixels left between ring and dot at the end. */
   gap: number;
   reason?: string;
+  /** How far the first ring appeared from where the corners said it would, in camera px. */
+  mapOff?: number;
 }
 
 const ROI = 240; // camera px, square, around where the point is expected
-const DOT_REACH = 60; // camera px: how far from the ring to look for the dot
+const DOT_REACH = 60; // camera px: how far from the ring to look for the dot, at most
+const DOT_SHARE = 0.4; // of the spacing between neighbouring dots in the picture: never look further than this for the dot, so a neighbour's dot is never taken for the point's own
+const MAP_ROUGH = 15; // camera px: rings appearing further than this from where the corners say is a map worth mentioning
 const RING_PIXELS = 30; // darkened pixels that count as seeing the ring
 const RING_REACH = 90; // camera px: how far from where the ring should be to look for it
 const RING_SPREAD = 60; // camera px: darkening further out than this on average is not a ring
@@ -145,13 +155,29 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
   const lit = await host.grab(roi);
   if (!lit) return { i, j, ok: false, gap: NaN, reason: 'no camera picture' };
   const guessInRoi = { x: guess.x - roi.x, y: guess.y - roi.y };
-  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, inward, retakes: 0, outcome: { i, j, ok: false, gap: NaN } };
+  // How far to look from the ring for the dot: well under the spacing of the dots in the picture, so that with
+  // the map out by most of a cell (corners clicked a crossing out, a lens that bends the picture) the dot taken
+  // is still the one nearest the ring and never a neighbour's.
+  const spacing = Math.min(
+    Infinity,
+    ...host.neighbours(i, j).map((n) => {
+      const c = applyHomography(h, n);
+      return Math.hypot(c.x - guess.x, c.y - guess.y);
+    }),
+  );
+  const reach = Number.isFinite(spacing) && spacing > 0 ? Math.min(DOT_REACH, DOT_SHARE * spacing) : DOT_REACH;
+  const diag: Diagnostic = { i, j, roi, lit, ringed: null, ring: null, dot: null, guess: guessInRoi, inward, retakes: 0, reach, outcome: { i, j, ok: false, gap: NaN } };
   let p = { ...start };
   const finish = (outcome: AutoOutcome): AutoOutcome => {
     if (!outcome.ok && (p.x !== start.x || p.y !== start.y)) host.setPoint(i, j, start);
+    if (diag.mapOff !== undefined) outcome.mapOff = diag.mapOff;
     diag.outcome = outcome;
     host.record?.(diag);
     return outcome;
+  };
+  /** The first ring seen says how good the corners' map is: how far it appeared from where the map put it. */
+  const noteMap = (ring: Pt, expected: Pt) => {
+    if (diag.mapOff === undefined) diag.mapOff = Math.hypot(ring.x - expected.x, ring.y - expected.y);
   };
 
   /** Show the ring at a screen point and find it in the picture, looking around `expected` (roi px). */
@@ -217,6 +243,7 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
       const stepped = ' (the rings for a corner or edge point are shown a step in from it, so the mat must be clear there)';
       const first = await seeRing(add(p, inward), inRoi(add(p, inward)));
       if (typeof first === 'string') return finish({ i, j, ok: false, gap, reason: first + stepped });
+      noteMap(first, inRoi(add(p, inward)));
       const second = await seeRing(add(p, inward, 2), inRoi(add(p, inward, 2)));
       if (typeof second === 'string') return finish({ i, j, ok: false, gap, reason: second + stepped });
       // Both rings must be whole, and as far apart in the picture as the map says they should be: a ring half
@@ -252,11 +279,16 @@ export async function autoPoint(host: AutoHost, i: number, j: number, memory: Au
     } else {
       const found = await seeRing(p, expected);
       if (typeof found === 'string') return finish({ i, j, ok: false, gap, reason: found });
+      noteMap(found, guessInRoi);
       ring = found;
     }
-    const dot = dotNear(lit, ring, DOT_REACH, DOT_SCORE);
+    const dot = dotNear(lit, ring, reach, DOT_SCORE);
     diag.dot = dot;
-    if (!dot) return finish({ i, j, ok: false, gap, reason: `no dot near the ring (best orange score ${Math.round(dotNear(lit, ring, DOT_REACH, 0, 1)?.peak ?? 0)}, ${DOT_SCORE} needed)` });
+    if (!dot) {
+      const best = dotNear(lit, ring, reach, 0, 1)?.peak ?? 0;
+      const why = best >= DOT_SCORE ? `only a speck of orange, not a dot` : `best orange score ${Math.round(best)}, ${DOT_SCORE} needed`;
+      return finish({ i, j, ok: false, gap, reason: `no dot within ${Math.round(reach)} px of the ring (${why})` });
+    }
     if (dot.spread > DOT_SPREAD) {
       return finish({ i, j, ok: false, gap, reason: `the orange near the ring is a line or a smear, not a dot (spread ${Math.round(dot.spread)} px, ${DOT_SPREAD} at most)` });
     }
@@ -333,6 +365,11 @@ export function summarise(outcomes: AutoOutcome[], label: (i: number, j: number)
       reasons.set(r, [...(reasons.get(r) ?? []), label(o.i, o.j)]);
     }
     text += ' Left as they were: ' + [...reasons].map(([r, labels]) => `${labels.join(', ')} (${r})`).join('; ') + '.';
+  }
+  const offs = outcomes.map((o) => o.mapOff).filter((m): m is number => m !== undefined && Number.isFinite(m));
+  const rough = median(offs, 0);
+  if (rough > MAP_ROUGH) {
+    text += ` The camera's corners put the rings about ${Math.round(rough)} px from where they appeared, which is rough: each point was matched to the dot nearest its ring, never further than a share of the gap between dots, so a point further than that from its dot is left for you to drag closer. Finding the corners again, zoomed in on each, may make the map truer.`;
   }
   return text;
 }

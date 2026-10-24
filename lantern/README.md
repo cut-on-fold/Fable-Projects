@@ -133,8 +133,14 @@ its centre is the middle of the orange patch's shape, every pixel counting
 the same and a glint bleached white inside it filled in, because the side
 of a dot facing the projector is lit more strongly, and an average that
 leans on the brighter pixels moved every point a couple of millimetres the
-same way. `tests/autocal.test.ts` runs the whole loop against a pretend
-table and camera.
+same way. The dot taken is the one nearest the ring, and never further
+from it than a share of the gap between neighbouring dots in the picture,
+so a camera map that is out by most of a cell (corners clicked a crossing
+out, a lens that bends the picture) cannot move a point to a neighbour's
+dot; the summary says when the map is that rough, and Camera frames shows
+how far each ring appeared from where the corners put it.
+`tests/autocal.test.ts` runs the whole loop against a pretend table and
+camera.
 
 The camera window also keeps out of the way: if it covers the point being
 worked on, it moves to the far corner of the screen.
