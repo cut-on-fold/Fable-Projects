@@ -71,6 +71,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.16** — the camera window asks for the biggest picture
+      the camera offers, up to 4K (a phone over Continuity Camera still
+      gives 1080p; a 4K webcam gives pixels half the size on the mat), and
+      says the picture's size when it opens.
 - [x] **Lantern v0.4.15** — Auto measures the projected ring by its darkest
       line rather than by every darkened pixel weighted by how dark. The
       mat glows: the projector's light travels a little way through it
