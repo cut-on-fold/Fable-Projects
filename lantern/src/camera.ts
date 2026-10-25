@@ -251,7 +251,9 @@ export class CameraPanel {
   private async pickDevice(deviceId: string | null): Promise<void> {
     this.stopStream();
     this.say('Starting the camera…');
-    const video: MediaTrackConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    // the biggest picture the camera offers, up to 4K: a phone over Continuity Camera gives 1080p whatever is
+    // asked, a 4K webcam gives four times the pixels, and Auto's seeing is the finer for every one of them
+    const video: MediaTrackConstraints = { width: { ideal: 3840 }, height: { ideal: 2160 } };
     if (deviceId) video.deviceId = { exact: deviceId };
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
@@ -319,7 +321,9 @@ export class CameraPanel {
   private sayState(): void {
     const sel = this.host.selected();
     const s = this.host.getSetup();
-    if (!s.corners) this.say(`Showing the whole picture. Find corners lets the view follow the selected point; a click looks there instead.${sel ? ` Selected: ${sel.label}.` : ''}`);
+    const size = this.pictureSize();
+    const px = size ? ` (${size.w} × ${size.h} px)` : '';
+    if (!s.corners) this.say(`Showing the whole picture${px}. Find corners lets the view follow the selected point; a click looks there instead.${sel ? ` Selected: ${sel.label}.` : ''}`);
     else if (this.manualCentre) this.say(`Looking where you clicked. Select another point to follow it again.`);
     else this.say(sel ? `Following ${sel.label}. Arrow keys nudge it; Tab picks the next along the row, Shift+Tab down.` : 'Select a point to follow it.');
   }

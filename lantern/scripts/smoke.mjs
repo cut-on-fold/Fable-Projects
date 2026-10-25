@@ -205,14 +205,16 @@ async function run(name, { dark }) {
   if (!/Following/.test(await page.textContent('#cam-status'))) errors.push(`${name}: camera status ${await page.textContent('#cam-status')}`);
   await page.screenshot({ path: join(SHOTS, `${name}-camera.png`) });
   // Auto against the fake camera: there are no dots to find, so every point is left as it was and the
-  // summary says so; the tools come back afterwards.
+  // summary says so; the tools come back afterwards. The page asks the camera for 4K and Chromium's pretend
+  // camera obliges, slowly, under software rendering (about two minutes for the twelve points here, where a
+  // real camera's frames arrive as fast as it is asked), so the wait is generous.
   s = await stored();
   const beforeAuto = JSON.stringify(s.calibrations[0].mesh.points);
   await page.click('#auto');
   await page.waitForTimeout(300);
   if (!(await page.isHidden('#bar'))) errors.push(`${name}: tools not hidden while Auto runs`);
   if (!(await page.isHidden('#peek'))) errors.push(`${name}: Show tools button not hidden while Auto runs`);
-  await page.waitForFunction(() => /points set from the camera|Nothing was set/.test(document.getElementById('hint')?.textContent ?? ''), null, { timeout: 60000 }).catch(() => errors.push(`${name}: Auto did not finish`));
+  await page.waitForFunction(() => /points set from the camera|Nothing was set/.test(document.getElementById('hint')?.textContent ?? ''), null, { timeout: 360000 }).catch(() => errors.push(`${name}: Auto did not finish`));
   const summary = await page.textContent('#hint');
   if (!/0 of 12 points set/.test(summary)) errors.push(`${name}: Auto summary: ${summary}`);
   s = await stored();

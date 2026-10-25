@@ -67,8 +67,11 @@ can be dragged and resized, the picture turned, mirrored and zoomed 1× to
 **Snapshot** saves the whole picture as the camera sees it, to check the
 projection from the chair or to send. The
 camera needs the page served over https (the Pages site) or from localhost,
-not opened as a saved file. The camera is never measured: it only decides
-where to zoom, and your eye does the aligning.
+not opened as a saved file. It asks the camera for the biggest picture it
+offers, up to 4K, and says the size it got when it opens: a phone over
+Continuity Camera gives 1080p, a 4K webcam four times the pixels, and
+Auto's seeing is the finer for every one of them. The camera is never
+measured: it only decides where to zoom, and your eye does the aligning.
 
 With an iPhone, how much of the table the picture shows is set by the Mac,
 not by Lantern: while the camera is open, click the green camera icon in
