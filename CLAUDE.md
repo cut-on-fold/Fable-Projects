@@ -178,7 +178,9 @@ Grain-Nest. Each project lives in its own folder with its own README;
 - `stencil/` — `dot-stencil.scad`, a printed stencil for painting the orange
   dots at the mat's crossings, with its STL and `preview.png`.
 - `mount/` — `phone-pocket.scad`, a printed ceiling pocket for the phone
-  Lantern uses as a camera, with STLs exported from it (OpenSCAD 2021.01).
+  Lantern uses as a camera, and `webcam-hanger.scad`, a slider and slab
+  for the same plate that hold a webcam by its tripod thread, with STLs
+  exported from both (OpenSCAD 2021.01).
 - `site/` — the landing page; the Pages workflow copies each project's `dist`
   under it (`/thimble/`, `/bolt-end/`, `/lantern/`).
 

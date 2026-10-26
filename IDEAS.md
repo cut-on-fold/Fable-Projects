@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Webcam hanger** — two printed parts for the phone pocket's ceiling
+      plate that hold a webcam instead: a slider with the same rails and a
+      slab the camera bolts to by its tripod thread, lens down, dropped
+      far enough for the plug in its back; drawn for a Logitech Brio 4K,
+      the numbers at the top of `mount/webcam-hanger.scad`.
 - [x] **Lantern v0.4.16** — the camera window asks for the biggest picture
       the camera offers, up to 4K (a phone over Continuity Camera still
       gives 1080p; a 4K webcam gives pixels half the size on the mat), and

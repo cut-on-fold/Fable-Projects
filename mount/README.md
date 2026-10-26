@@ -50,3 +50,55 @@ For the default phone the plate is 94 × 164 mm and the pocket hangs 22 mm
 below the ceiling. The window is 60 mm long from the closed end and spans
 the floor but for a 3 mm rail each side, which clears any phone's camera
 island.
+
+# Webcam hanger
+
+The same plate can hold a webcam instead of the phone. `webcam-hanger.scad`
+makes two parts that take the pocket's place: a **slider**, a deck with the
+same beaded rail along each side, and a **hanger**, a slab that screws to
+the deck's underside and hangs down one side of the camera. The camera bolts
+to the hanger by its own tripod thread, lens down, and a ridge along the
+hanger's foot and one at each end keep it square so it cannot swing on the
+bolt. It is drawn for a Logitech Brio 4K (a 103 × 28 × 28 mm bar with the
+thread in the middle of one long side and the USB-C socket on the back);
+for another camera, change the numbers at the top of the file.
+
+![the hanger on its slider, with the camera](webcam-preview.png)
+
+| Part | What it is | Printed |
+|---|---|---|
+| `webcam-slider.stl` | The deck with the rails; slides into the plate's channels like the pocket. | Deck down, rails up |
+| `webcam-hanger.stl` | The slab the camera bolts to, with its ridges. | Flat on its outer face, ridges up |
+
+Neither needs supports. Three 4 mm screws go down through the deck's
+countersunk holes into the hanger's top edge, and the camera's bolt (a
+¼ in thumb bolt with at least 10 mm of thread showing) goes through the
+hanger's hole into the camera's thread.
+
+```sh
+openscad -o webcam-slider.stl -D 'part="slider"' webcam-hanger.scad
+openscad -o webcam-hanger.stl -D 'part="hanger"' webcam-hanger.scad
+```
+
+`part="fitted"` shows the two parts as hung with the camera in place.
+
+The camera's socket is on its back, so with the lens looking down the plug
+points at the ceiling: the hanger drops the camera 67 mm below the deck, 52
+for the plug and its strain relief and 15 for the cable to turn along the
+ceiling. With a right-angle plug, set `plug_room` to its height and the
+hanger shortens to match. The camera's length runs along the slide, which
+is the way its wide picture runs, so put the plate's channels along the
+table's long side. From a ceiling 1.3 m above the table the drop leaves the
+camera at about 1.24 m, where the Brio's 90° setting takes in roughly
+2.1 × 1.2 m.
+
+## Putting it up
+
+1. Screw the hanger to the slider: slider deck up, hanger's top edge against
+   its underside at the countersunk holes, three 4 mm screws from above.
+2. Bolt the camera to the hanger, lens down, its thread side against the
+   hanger, resting on the foot ridge between the end ridges. Plug the cable
+   in before it goes up; it rises beside the hanger and turns along the
+   ceiling.
+3. Slide the slider into the plate's channels until it meets the end stop,
+   the same way as the pocket.
