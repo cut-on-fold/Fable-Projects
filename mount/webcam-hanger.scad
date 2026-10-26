@@ -1,18 +1,20 @@
 // A hanger for a webcam on the same ceiling plate as the phone pocket, for
 // Lantern's camera over the cutting table.
 //
-// Two printed parts, three screws and the camera's own tripod bolt:
+// Two printed parts, two screws and the camera's own tripod bolt:
 //   slider  a deck with a beaded rail along each side; slides into the
 //           plate's channels in place of the pocket (plate.stl from
 //           phone-pocket.scad, unchanged).
 //   hanger  a slab that screws to the deck's underside and hangs down one
 //           side of the camera; the camera's tripod thread bolts to it, lens
 //           down, and a ridge along its foot and at each end keep the camera
-//           square and stop it swinging on the bolt.
+//           square and stop it swinging on the bolt. A slot through the slab
+//           above the camera's back lets the cable pass through it rather
+//           than round its end.
 // The camera's cable socket is on its back, so with the lens looking down
 // the plug points up at the ceiling: the hanger drops the camera far enough
-// for the plug and the cable's bend. If a right-angle plug is used later,
-// shorten `plug_room`.
+// for the plug and the cable's turn into the slot. If a right-angle plug is
+// used later, shorten `plug_room`.
 //
 // Drawn for a Logitech Brio 4K: a 103 × 28 × 28 mm bar, lens on the front,
 // USB-C socket on the back, 1/4 in thread in the middle of one long side.
@@ -32,7 +34,7 @@ cam_w = 28;         // width, thread face to the other side
 thread_from_end = 51.5;   // the tripod thread's distance from one end of the camera
 thread_from_lens = 14;    // ... and from the lens face
 plug_room = 52;     // how far the plug and its strain relief stand out of the back
-cable_bend = 15;    // room above the plug for the cable to turn along the ceiling
+cable_bend = 30;    // room above the plug for the cable to turn and pass through the hanger's slot
 bolt_d = 6.6;       // clearance for a 1/4 in bolt
 cheek_t = 8;        // the hanger's thickness; the camera bolt must have more thread than this
 
@@ -43,7 +45,10 @@ end_gap = 0.5;      // clearance between the camera and each end ridge
 hanger_l = cam_l + 2 * end_gap + 2 * ridge_t;
 screw_pilot = 3.4;  // for a 4 mm screw cut into the hanger's top edge
 screw_depth = 12;
-screws = [20, hanger_l / 2, hanger_l - 20];   // along the length
+screws = [18, hanger_l - 18];   // along the length, clear of the cable slot in the middle
+slot_w = 12;        // the cable slot through the hanger, above the camera's back: the cable passes through
+slot_h = 20;        // it rather than round the hanger's end
+slot_top = 15;      // below the deck, clear of the screws' pilot holes
 
 // ---------- the slider: the same slide as the pocket, so it fits the same plate
 wall = 2.4;         // the rail's thickness, matching the pocket's wall
@@ -105,6 +110,9 @@ module hanger() {
     }
     // the camera bolt
     translate([-1, ridge_t + end_gap + thread_from_end, bolt_y]) rotate([0, 90, 0]) cylinder(d = bolt_d, h = cheek_t + 2);
+    // the cable slot, a rounded slot through the slab above the plug
+    hull() for (z = [slot_top + slot_w / 2, slot_top + slot_h - slot_w / 2])
+      translate([-1, ridge_t + end_gap + cam_l / 2, z]) rotate([0, 90, 0]) cylinder(d = slot_w, h = cheek_t + 2);
     // pilot holes for the screws from the deck
     for (y = screws) translate([cheek_t / 2, y, -1]) cylinder(d = screw_pilot, h = screw_depth + 1);
   }
