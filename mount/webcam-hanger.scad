@@ -36,7 +36,7 @@ thread_from_lens = 14;    // ... and from the lens face
 plug_room = 52;     // how far the plug and its strain relief stand out of the back
 cable_bend = 30;    // room above the plug for the cable to turn and pass through the hanger's slot
 bolt_d = 6.6;       // clearance for a 1/4 in bolt
-cheek_t = 8;        // the hanger's thickness; the camera bolt must have more thread than this
+cheek_t = 12;       // the hanger's thickness: the thread the camera's bolt shows when screwed fully home, so its head clamps the slab just as the bolt bottoms out (a washer under the head takes up a little slack)
 
 // ---------- the hanger
 ridge = 4;          // how far the ridges stand proud of the cheek, under the camera's edge and at its ends

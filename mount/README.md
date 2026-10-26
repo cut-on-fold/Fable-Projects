@@ -74,8 +74,11 @@ for another camera, change the numbers at the top of the file.
 
 Neither needs supports. Two 4 mm screws go down through the deck's
 countersunk holes into the hanger's top edge, and the camera's bolt (a
-¼ in thumb bolt with at least 10 mm of thread showing) goes through the
-hanger's hole into the camera's thread.
+¼ in thumb bolt) goes through the hanger's hole into the camera's thread.
+The hanger is 12 mm thick there, the thread the bolt shows when screwed
+fully home, so the head clamps the slab as the bolt bottoms out; set
+`cheek_t` to your own bolt's figure, and a washer under the head takes up
+a little slack.
 
 ```sh
 openscad -o webcam-slider.stl -D 'part="slider"' webcam-hanger.scad
