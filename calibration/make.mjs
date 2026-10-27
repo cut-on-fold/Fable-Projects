@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Writes the calibration cards in cards/ as SVG files, in millimetres, for
-// projecting with Lantern or Pattern Projector or printing at 100%. The
+// projecting with Lantern or other projection calibration software, or printing at 100%. The
 // drawing is in card.mjs (Lantern draws a card for any table size from it);
 // the sizes are below. No dependencies: `node make.mjs`.
 

@@ -320,7 +320,7 @@ function buildBar(): void {
       'div',
       { class: 'group' },
       btn('Project the card', { id: 'project-card', title: 'A calibration card the size of this table, to check the calibration on the mat with a tape', onclick: () => void loadFile(cardFile()) }),
-      btn('Save card', { id: 'save-card', title: 'The same card as an SVG, for Pattern Projector or to print', onclick: saveCard }),
+      btn('Save card', { id: 'save-card', title: 'The same card as an SVG, for other projection calibration software or to print', onclick: saveCard }),
     );
     const view = el(
       'div',

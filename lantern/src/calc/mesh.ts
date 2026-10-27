@@ -9,7 +9,7 @@
 // to find on the mat, every 6 in say, with the last cell shorter if the mat
 // is not a multiple.
 //
-// The four corners fix a homography, the same model Pattern Projector uses,
+// The four corners fix a homography, the same model other projection calibration software uses,
 // which is exact for a flat table at any tilt. Every other point is kept as
 // a nudge away from where that homography would put it, and the nudges are
 // blended bilinearly inside each cell. So adding points changes nothing

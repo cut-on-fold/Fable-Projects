@@ -46,7 +46,7 @@ like to know:
 ## Lantern
 
 - [ ] **Stitching multi-page PDFs** — tiled home-print patterns laid out into
-      one sheet, the way Pattern Projector does; Lantern opens one page at a
+      one sheet, as other projection software does; Lantern opens one page at a
       time, which is fine for copyshop A0 files.
 - [ ] **A point where the trouble is** — the mesh is a grid at one spacing,
       so a dip in one corner means a whole column of points; a point dropped
@@ -71,6 +71,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.18** — other projection calibration software is named
+      generally rather than by one product, in the Save card tip, the code
+      comments, the landing page and the ideas list; the Thanks section in
+      Lantern's README keeps its credit.
 - [x] **Lantern v0.4.17** — a **Guide** button in the bar opens this README
       in a new tab, for anyone who arrives by the link; and the camera
       window no longer parks itself over the tools after Auto (it keeps
