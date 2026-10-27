@@ -47,9 +47,9 @@ And for drawing a mat for Lantern's automatic calibration:
 | `dot-tile-a4.svg` | A4 | The same on A4 |
 | `dots-8mm-100.svg` | 120 × 120 mm | 100 circles of 8 mm to cut from orange vinyl on a Cricut or similar: just the circles, nothing else to cut |
 
-Open a projector card in Lantern or Pattern Projector the same way as a
-Grain-Nest export, calibrate as usual, then measure the squares on the table
-with a tape. The layers (Grid cm or Grid in, Rulers in, Keystone, Calibration,
+Open a projector card in Lantern or other projection calibration software
+the same way as a Grain-Nest export, calibrate as usual, then measure the
+squares on the table with a tape. The layers (Grid cm or Grid in, Rulers in, Keystone, Calibration,
 Instructions, Border) can be switched off one at a time, so you can project
 just the grid onto fabric to check it is on grain before cutting.
 

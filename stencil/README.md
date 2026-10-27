@@ -32,4 +32,4 @@ openscad -o dot-stencil.stl -D 'part="stencil"' dot-stencil.scad
 
 Any orange will do for Lantern as long as it is plainly orange: acrylic
 paint or an acrylic paint marker, two coats, is what the dots so far have
-been. Not red, and not yellow.
+been, and 8 mm (this stencil's size) worked best. Not red, and not yellow.
