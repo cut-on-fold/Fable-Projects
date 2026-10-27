@@ -110,6 +110,9 @@ async function run(name, { dark }) {
   await page.goto(URL);
   await page.waitForTimeout(400);
 
+  // The guide: the README, in a new tab.
+  const guide = await page.$eval('#guide', (a) => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') }));
+  if (!/lantern\/README\.md/.test(guide.href) || guide.target !== '_blank' || !/noopener/.test(guide.rel)) errors.push(`${name}: guide link ${JSON.stringify(guide)}`);
   // Calibrate: starts with the corners; add columns; drag a corner and nudge it.
   if ((await page.getAttribute('#tab-calibrate', 'aria-pressed')) !== 'true') errors.push(`${name}: not calibrating at first`);
   await page.click('#add-points'); // every 15 cm on a 90 × 60 cm table: 7 × 5 points

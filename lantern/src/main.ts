@@ -243,7 +243,9 @@ function buildBar(): void {
     el('button', { type: 'button', id: 'unit-cm', 'aria-pressed': String(state.unit === 'cm'), onclick: () => setUnit('cm') }, 'cm'),
     el('button', { type: 'button', id: 'unit-in', 'aria-pressed': String(state.unit === 'in'), onclick: () => setUnit('in') }, 'in'),
   );
-  bar.append(brand, tabs, el('div', { class: 'group' }, el('label', {}, 'Table', calSelect), units));
+  // the guide: the README on GitHub, in a new tab, for anyone who arrives by the link
+  const guide = el('a', { class: 'btn', id: 'guide', href: 'https://github.com/cut-on-fold/Fable-Projects/blob/main/lantern/README.md#how-to-use-it', target: '_blank', rel: 'noopener', title: 'How to use Lantern: calibrating, projecting, the camera and Auto. Opens in a new tab.' }, 'Guide');
+  bar.append(brand, tabs, el('div', { class: 'group' }, el('label', {}, 'Table', calSelect), units, guide));
 
   if (state.mode === 'calibrate') {
     const widthBox = el('input', { type: 'text', id: 'table-width', inputmode: 'decimal', value: inputText(m.width, state.unit), 'aria-label': 'Table width' });
@@ -752,7 +754,7 @@ function setBarHidden(hidden: boolean): void {
   if (hidden) {
     popOpen = null;
     renderPop();
-  }
+  } else cameraPanel?.keepBelowTools(); // a window parked at the top while the tools were away must not cover them
 }
 
 function switchCalibration(i: number): void {

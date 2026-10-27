@@ -219,7 +219,13 @@ export class CameraPanel {
     this.root.style.visibility = hidden ? 'hidden' : '';
   }
 
-  /** If the window covers a screen point that matters, move it to the corner of the screen furthest from it. */
+  /** Where the tools end, in screen pixels from the top: the window keeps below them when they are showing. */
+  private toolsBottom(): number {
+    const bar = document.getElementById('bar');
+    return bar && !bar.hidden ? bar.getBoundingClientRect().bottom : 0;
+  }
+
+  /** If the window covers a screen point that matters, move it to the corner of the screen furthest from it, below the tools. */
   avoid(p: Pt, margin = 60): void {
     const r = this.root.getBoundingClientRect();
     if (p.x < r.left - margin || p.x > r.right + margin || p.y < r.top - margin || p.y > r.bottom + margin) return;
@@ -228,7 +234,19 @@ export class CameraPanel {
     const left = p.x > W / 2;
     const top = p.y > H / 2;
     this.root.style.left = left ? '12px' : `${Math.max(0, W - r.width - 12)}px`;
-    this.root.style.top = top ? '12px' : `${Math.max(0, H - r.height - 12)}px`;
+    this.root.style.top = top ? `${this.toolsBottom() + 12}px` : `${Math.max(0, H - r.height - 12)}px`;
+    this.root.style.right = 'auto';
+    this.root.style.bottom = 'auto';
+  }
+
+  /** When the tools come back, a window that was put at the top while they were hidden moves down from under them. */
+  keepBelowTools(): void {
+    const limit = this.toolsBottom();
+    if (!limit) return;
+    const r = this.root.getBoundingClientRect();
+    if (r.top >= limit) return;
+    this.root.style.left = `${r.left}px`;
+    this.root.style.top = `${Math.min(limit + 12, Math.max(0, window.innerHeight - r.height - 12))}px`;
     this.root.style.right = 'auto';
     this.root.style.bottom = 'auto';
   }

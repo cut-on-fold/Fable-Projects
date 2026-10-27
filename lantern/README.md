@@ -15,6 +15,8 @@ is labelled with, so the picture bends to follow the surface.
 
 ## How to use it
 
+(**Guide** in Lantern's bar opens this page in a new tab.)
+
 1. **Calibrate**, once per table. Put the size of your mat (or of a rectangle
    you have taped out and measured) in the boxes, go full screen, and drag the
    four corners onto its corners. The grid is every centimetre (or inch) and
@@ -186,7 +188,9 @@ how far each ring appeared from where the corners put it.
 camera.
 
 The camera window also keeps out of the way: if it covers the point being
-worked on, it moves to the far corner of the screen.
+worked on, it moves to the far corner of the screen, below the tools, and
+a window parked at the top while the tools were hidden moves down from
+under them when they come back.
 
 With no gridded mat, as on a floor: tape out a rectangle, measure it, put its
 size in the boxes, drag the corners onto it, and lay a tape measure along a

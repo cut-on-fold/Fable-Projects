@@ -71,6 +71,10 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.17** — a **Guide** button in the bar opens this README
+      in a new tab, for anyone who arrives by the link; and the camera
+      window no longer parks itself over the tools after Auto (it keeps
+      below them, and moves down from under them when they come back).
 - [x] **Webcam hanger** — two printed parts for the phone pocket's ceiling
       plate that hold a webcam instead: a slider with the same rails and a
       slab the camera bolts to by its tripod thread, lens down, dropped
