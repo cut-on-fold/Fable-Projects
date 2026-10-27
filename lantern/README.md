@@ -81,6 +81,37 @@ only just does. The Mac remembers the setting for the browser, separately
 from other apps, and now and then goes back to 1× on its own, so if the
 picture has narrowed, that is where to look. Centre Stage should be off.
 
+With a webcam on the ceiling instead (a Logitech Brio 4K in the
+[webcam hanger](../mount/), over a wired, active 5 m USB 3 extension), the
+settings that gave Auto its best run, set in Logitech's app with the
+projector showing white and Lantern's camera window open to watch the
+effect:
+
+- Field of view 90°, no zoom; the camera's length along the table's long
+  side.
+- Autofocus off, focus set by hand until the dots are crisp.
+- Auto exposure off; shutter 1/30 s (1/60 or 1/30 avoid flicker from a
+  60 Hz projector, and nothing moves, so the slower one is a cleaner
+  picture); ISO 100, and 1/15 s before a higher ISO if the mat looks dim.
+  The mat should look light grey to white with the dots clearly orange.
+- HDR off: it blends exposures and works the edges, which are what Auto
+  measures.
+- Auto white balance off; colour temperature about 6500 K, nudged until
+  the lit mat looks white rather than blue or yellow, because Auto judges
+  the dot by its hue.
+- Brightness, contrast and saturation left at the middle; sharpness low,
+  since sharpening draws halos round edges.
+
+The camera keeps the settings while it stays plugged in, and the app puts
+them back after a restart. On an opaque PVC mat (grey side, black lines)
+with 8 mm matt orange vinyl dots, that setup set every point to a fraction
+of a camera pixel (0.6 mm at 4K) and the projected card measured true with
+a tape across and down the table. A translucent acrylic board, by
+contrast, glows: the projector's light travels a little way through it
+away from the projector, and every ring is measured a millimetre or two
+towards the projector of where it is, more so far from it, which no way of
+measuring the ring undoes.
+
 **Automatically.** With orange dots on the mat crossings (acrylic paint,
 about 4 mm, two coats, or 8 mm circles of orange vinyl) and the camera open
 with its corners found, **Auto**
