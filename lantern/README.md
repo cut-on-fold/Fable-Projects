@@ -81,6 +81,40 @@ only just does. The Mac remembers the setting for the browser, separately
 from other apps, and now and then goes back to 1× on its own, so if the
 picture has narrowed, that is where to look. Centre Stage should be off.
 
+With a webcam on the ceiling instead (a Logitech Brio 4K in the
+[webcam hanger](../mount/), over a wired, active 5 m USB 3 extension), the
+settings that gave Auto its best run, set in Logitech's app with the
+projector showing white and Lantern's camera window open to watch the
+effect:
+
+- Field of view 90°, no zoom; the camera's length along the table's long
+  side.
+- Autofocus off; focus at 0%, the far end of its scale, which is sharp at
+  1.2 m with the wide lens. Set it by eye in the camera window if the
+  dots are not crisp.
+- Auto exposure off; shutter 1/20 s and ISO 100. A shutter of a whole
+  number of the projector's refreshes (1/60, 1/30, 1/20 for 60 Hz) avoids
+  flicker bands, and nothing moves, so a slower one is a cleaner picture
+  than a higher ISO. The mat should look light grey to white with the dots
+  clearly orange.
+- HDR off: it blends exposures and works the edges, which are what Auto
+  measures.
+- Auto white balance off; colour temperature about 6100 K, nudged until
+  the lit mat looks white rather than blue or yellow, because Auto judges
+  the dot by its hue.
+- Brightness, contrast and saturation at 50%; sharpness 15%, since
+  sharpening draws halos round edges.
+
+The camera keeps the settings while it stays plugged in, and the app puts
+them back after a restart. On an opaque PVC mat (grey side, black lines)
+with 8 mm matt orange vinyl dots, that setup set every point to a fraction
+of a camera pixel (0.6 mm at 4K) and the projected card measured true with
+a tape across and down the table. A translucent acrylic board, by
+contrast, glows: the projector's light travels a little way through it
+away from the projector, and every ring is measured a millimetre or two
+towards the projector of where it is, more so far from it, which no way of
+measuring the ring undoes.
+
 **Automatically.** With orange dots on the mat crossings (acrylic paint,
 about 4 mm, two coats, or 8 mm circles of orange vinyl) and the camera open
 with its corners found, **Auto**
