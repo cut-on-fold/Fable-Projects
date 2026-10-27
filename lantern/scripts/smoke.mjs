@@ -123,7 +123,11 @@ async function run(name, { dark }) {
   await page.press('#spacing', 'Enter');
   await page.waitForTimeout(50);
   if ((await page.textContent('#points')) !== '4 × 3 points') errors.push(`${name}: after 30 cm, ${await page.textContent('#points')}`);
-  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));
+  // The page saves its state 150 ms after a change; wait for the save rather than guess at the runner's speed.
+  const stored = async () => {
+    await page.waitForFunction(() => !!localStorage.getItem('lantern.v1'), null, { timeout: 5000 });
+    return page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));
+  };
   await page.waitForTimeout(250);
   let s = await stored();
   const tl = s.calibrations[0].mesh.points[0];
