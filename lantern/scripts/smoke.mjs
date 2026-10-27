@@ -10,7 +10,7 @@
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,9 +61,22 @@ export function makePdf() {
 const PDF = makePdf();
 const CARD = readFileSync(join(HERE, '..', '..', 'calibration', 'cards', 'projector-60x40cm.svg'));
 
+// The pretend camera's picture: a plain light-grey frame in a small video file. The page asks any camera for
+// 4K, and Chromium's own synthetic picture at that size is slow enough under software rendering to miss
+// clicks on the test runner; a file of its own keeps the picture small and the camera quick.
+const FAKE_CAMERA = join(SHOTS, 'fake-camera.y4m');
+writeFileSync(FAKE_CAMERA, fakeCameraFile(640, 360));
+function fakeCameraFile(w, h) {
+  const header = Buffer.from(`YUV4MPEG2 W${w} H${h} F30:1 Ip A1:1 C420jpeg\n`, 'latin1');
+  const luma = Buffer.alloc(w * h, 200);
+  const chroma = Buffer.alloc((w / 2) * (h / 2), 128);
+  const frame = Buffer.concat([Buffer.from('FRAME\n', 'latin1'), luma, chroma, chroma]);
+  return Buffer.concat([header, frame, frame]);
+}
+
 const browser = await chromium.launch({
   executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${FAKE_CAMERA}`, '--use-fake-ui-for-media-stream'],
 });
 const errors = [];
 
@@ -205,9 +218,8 @@ async function run(name, { dark }) {
   if (!/Following/.test(await page.textContent('#cam-status'))) errors.push(`${name}: camera status ${await page.textContent('#cam-status')}`);
   await page.screenshot({ path: join(SHOTS, `${name}-camera.png`) });
   // Auto against the fake camera: there are no dots to find, so every point is left as it was and the
-  // summary says so; the tools come back afterwards. The page asks the camera for 4K and Chromium's pretend
-  // camera obliges, slowly, under software rendering (about two minutes for the twelve points here, where a
-  // real camera's frames arrive as fast as it is asked), so the wait is generous.
+  // summary says so; the tools come back afterwards. With the small pretend picture this takes well under a
+  // minute; the wait is generous for a slow runner.
   s = await stored();
   const beforeAuto = JSON.stringify(s.calibrations[0].mesh.points);
   await page.click('#auto');
