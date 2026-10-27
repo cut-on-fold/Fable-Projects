@@ -89,18 +89,21 @@ effect:
 
 - Field of view 90°, no zoom; the camera's length along the table's long
   side.
-- Autofocus off, focus set by hand until the dots are crisp.
-- Auto exposure off; shutter 1/30 s (1/60 or 1/30 avoid flicker from a
-  60 Hz projector, and nothing moves, so the slower one is a cleaner
-  picture); ISO 100, and 1/15 s before a higher ISO if the mat looks dim.
-  The mat should look light grey to white with the dots clearly orange.
+- Autofocus off; focus at 0%, the far end of its scale, which is sharp at
+  1.2 m with the wide lens. Set it by eye in the camera window if the
+  dots are not crisp.
+- Auto exposure off; shutter 1/20 s and ISO 100. A shutter of a whole
+  number of the projector's refreshes (1/60, 1/30, 1/20 for 60 Hz) avoids
+  flicker bands, and nothing moves, so a slower one is a cleaner picture
+  than a higher ISO. The mat should look light grey to white with the dots
+  clearly orange.
 - HDR off: it blends exposures and works the edges, which are what Auto
   measures.
-- Auto white balance off; colour temperature about 6500 K, nudged until
+- Auto white balance off; colour temperature about 6100 K, nudged until
   the lit mat looks white rather than blue or yellow, because Auto judges
   the dot by its hue.
-- Brightness, contrast and saturation left at the middle; sharpness low,
-  since sharpening draws halos round edges.
+- Brightness, contrast and saturation at 50%; sharpness 15%, since
+  sharpening draws halos round edges.
 
 The camera keeps the settings while it stays plugged in, and the app puts
 them back after a restart. On an opaque PVC mat (grey side, black lines)
