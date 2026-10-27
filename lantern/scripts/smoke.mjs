@@ -110,6 +110,9 @@ async function run(name, { dark }) {
   await page.goto(URL);
   await page.waitForTimeout(400);
 
+  // The guide: the README, in a new tab.
+  const guide = await page.$eval('#guide', (a) => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') }));
+  if (!/lantern\/README\.md/.test(guide.href) || guide.target !== '_blank' || !/noopener/.test(guide.rel)) errors.push(`${name}: guide link ${JSON.stringify(guide)}`);
   // Calibrate: starts with the corners; add columns; drag a corner and nudge it.
   if ((await page.getAttribute('#tab-calibrate', 'aria-pressed')) !== 'true') errors.push(`${name}: not calibrating at first`);
   await page.click('#add-points'); // every 15 cm on a 90 × 60 cm table: 7 × 5 points
@@ -120,7 +123,11 @@ async function run(name, { dark }) {
   await page.press('#spacing', 'Enter');
   await page.waitForTimeout(50);
   if ((await page.textContent('#points')) !== '4 × 3 points') errors.push(`${name}: after 30 cm, ${await page.textContent('#points')}`);
-  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));
+  // The page saves its state 150 ms after a change; wait for the save rather than guess at the runner's speed.
+  const stored = async () => {
+    await page.waitForFunction(() => !!localStorage.getItem('lantern.v1'), null, { timeout: 5000 });
+    return page.evaluate(() => JSON.parse(localStorage.getItem('lantern.v1')));
+  };
   await page.waitForTimeout(250);
   let s = await stored();
   const tl = s.calibrations[0].mesh.points[0];
