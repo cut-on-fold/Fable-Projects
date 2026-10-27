@@ -5,10 +5,10 @@ page: open a PDF pattern (or an SVG from Grain-Nest), it is drawn at true size
 through the calibration, drag it into place and cut. Nothing leaves the
 browser.
 
-The reason it exists: Pattern Projector's calibration is four corners, which
-is exactly right for a flat table at any tilt and nothing else. A desk that
-dips at one end, a floor that is not quite a plane, or a cheap projector lens
-that bulges the middle of the picture, all leave the middle of the grid out
+The reason it exists: other projection calibration software uses four
+corners, which is exactly right for a flat table at any tilt and nothing else.
+A desk that dips at one end, a floor that is not quite a plane, or a projector
+lens that bulges the middle of the picture, all leave the middle of the grid out
 while the corners are perfect. Lantern starts with the same four corners and
 then lets you add points between them and drag each one onto the mat line it
 is labelled with, so the picture bends to follow the surface.
@@ -49,7 +49,7 @@ is labelled with, so the picture bends to follow the surface.
 the table, with the grid in the unit you are using, and opens it as the
 pattern: every line should sit on a line of the mat, and the squares measure
 true with a tape. **Save card** writes the same card as an SVG, to project
-with Pattern Projector or to print.
+with other projection calibration software or to print.
 
 Each table keeps its own calibration (**New table** for Desk, Floor, …), and
 each remembers the window it was made in, so calibrate in full screen and
@@ -118,7 +118,8 @@ towards the projector of where it is, more so far from it, which no way of
 measuring the ring undoes.
 
 **Automatically.** With orange dots on the mat crossings (acrylic paint,
-about 4 mm, two coats, or 8 mm circles of orange vinyl) and the camera open
+8 mm across, two coats, which is what the [dot stencil](../stencil/) makes
+and what worked best; or 8 mm circles of orange vinyl) and the camera open
 with its corners found, **Auto**
 sets every point itself, or `A` sets the selected one and `Shift+A` all of
 them. The screen goes white and a small black ring is projected at each
