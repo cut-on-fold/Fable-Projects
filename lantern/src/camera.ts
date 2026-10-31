@@ -9,6 +9,7 @@
 // that is only used to decide where to zoom; the eye does the aligning.
 
 import { applyHomography, homographyFromPoints, type Mat3, type Pt } from './calc/homography';
+import type { DotSeen } from './calc/reference';
 import type { Frame } from './calc/vision';
 
 export interface CameraSetup {
@@ -20,10 +21,16 @@ export interface CameraSetup {
   mirror: boolean;
   /** Where the four mesh corners (top-left, top-right, bottom-right, bottom-left) show in the picture, in video pixels; null until clicked. */
   corners: Pt[] | null;
+  /**
+   * The dots Auto has found with this camera, one per table crossing, for the reference photos' list of matched
+   * points. Forgotten when the corners are found again or another camera is chosen: either means the camera
+   * has moved.
+   */
+  dots: DotSeen[];
 }
 
 export function defaultCameraSetup(): CameraSetup {
-  return { deviceId: null, zoom: 4, turn: 0, mirror: false, corners: null };
+  return { deviceId: null, zoom: 4, turn: 0, mirror: false, corners: null, dots: [] };
 }
 
 export function parseCameraSetup(raw: unknown): CameraSetup {
@@ -31,13 +38,29 @@ export function parseCameraSetup(raw: unknown): CameraSetup {
   if (!raw || typeof raw !== 'object') return d;
   const c = raw as Partial<CameraSetup>;
   const pt = (p: unknown): p is Pt => !!p && typeof p === 'object' && Number.isFinite((p as Pt).x) && Number.isFinite((p as Pt).y);
+  const dot = (v: unknown): v is DotSeen => !!v && typeof v === 'object' && pt((v as DotSeen).table) && pt((v as DotSeen).pixel) && Number.isFinite((v as DotSeen).gap);
   return {
     deviceId: typeof c.deviceId === 'string' ? c.deviceId : null,
     zoom: [1, 2, 4, 8].includes(c.zoom as number) ? (c.zoom as number) : d.zoom,
     turn: [0, 90, 180, 270].includes(c.turn as number) ? (c.turn as number) : 0,
     mirror: !!c.mirror,
     corners: Array.isArray(c.corners) && c.corners.length === 4 && c.corners.every(pt) ? c.corners.map((p) => ({ x: p.x, y: p.y })) : null,
+    dots: Array.isArray(c.dots) ? c.dots.filter(dot).map((v) => ({ table: { x: v.table.x, y: v.table.y }, pixel: { x: v.pixel.x, y: v.pixel.y }, gap: v.gap })) : [],
   };
+}
+
+/** The setup with a dot Auto has just seen at a table crossing, in place of any earlier one there. */
+export function withDot(setup: CameraSetup, seen: DotSeen): CameraSetup {
+  const same = (a: Pt, b: Pt) => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
+  return { ...setup, dots: [...setup.dots.filter((d) => !same(d.table, seen.table)), seen] };
+}
+
+/** A whole camera frame saved as a PNG, with the camera's settings as the browser reports them at the time. */
+export interface Photo {
+  blob: Blob;
+  width: number;
+  height: number;
+  settings: Record<string, unknown>;
 }
 
 export interface CameraHost {
@@ -48,6 +71,8 @@ export interface CameraHost {
   /** The selected calibration point on the screen, and a label for it. */
   selected(): { screen: Pt; label: string; key: string } | null;
   onClose(): void;
+  /** The Reference button: two full-size photos, with the grid projected and with the projector off. */
+  onReference(): void;
 }
 
 const CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
@@ -109,6 +134,7 @@ export class CameraPanel {
       el('button', { type: 'button', class: 'btn', id: 'cam-mirror', 'aria-pressed': String(host.getSetup().mirror), title: 'Mirror the picture', onclick: () => this.update({ mirror: !this.host.getSetup().mirror }) }, 'Mirror'),
       el('button', { type: 'button', class: 'btn', id: 'cam-corners', title: 'Click the four corner crosses in the picture, so the view can follow the selected point', onclick: () => this.startSetup() }, 'Find corners'),
       el('button', { type: 'button', class: 'btn', id: 'cam-snap', title: 'Save the whole camera picture as it is now, to look at or to send', onclick: () => void this.snapshot() }, 'Snapshot'),
+      el('button', { type: 'button', class: 'btn', id: 'cam-reference', title: 'Two full-size photos for work outside Lantern: one with the grid projected, then one with the projector off, with a file saying what the grid is and where the table sits in the picture', onclick: () => this.host.onReference() }, 'Reference'),
       el('button', { type: 'button', class: 'btn', id: 'cam-close', 'aria-label': 'Close the camera', onclick: () => this.close() }, '×'),
     );
     head.addEventListener('pointerdown', (e) => {
@@ -187,6 +213,37 @@ export class CameraPanel {
     ctx.drawImage(this.video, roi.x, roi.y, roi.w, roi.h, 0, 0, roi.w, roi.h);
     const img = ctx.getImageData(0, 0, roi.w, roi.h);
     return { width: img.width, height: img.height, data: img.data };
+  }
+
+  /** The camera's settings as the browser reports them now: picture size, frame rate, and whatever else it knows. */
+  trackSettings(): Record<string, unknown> {
+    const track = this.stream?.getVideoTracks()[0];
+    if (!track) return {};
+    const s = { ...track.getSettings() } as Record<string, unknown>;
+    delete s.deviceId; // an opaque id the browser makes up for the page: nothing outside it can use it
+    delete s.groupId;
+    s.label = track.label;
+    return s;
+  }
+
+  /**
+   * The whole picture as the camera's next frame shows it, at the camera's own size, as a PNG: nothing turned,
+   * mirrored, cropped or scaled, and the stream left as it is, so two photos in a row come from the same
+   * settings.
+   */
+  async photo(): Promise<Photo | null> {
+    await this.nextFrame();
+    const size = this.pictureSize();
+    if (!size) return null;
+    const settings = this.trackSettings();
+    const c = document.createElement('canvas');
+    c.width = size.w;
+    c.height = size.h;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(this.video, 0, 0, size.w, size.h);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/png'));
+    return blob ? { blob, width: size.w, height: size.h, settings } : null;
   }
 
   /** Save the whole picture, as the camera sees it (no zoom, turn or mirror), as a PNG. */
@@ -285,7 +342,9 @@ export class CameraPanel {
     await this.video.play().catch(() => {});
     const track = this.stream.getVideoTracks()[0];
     const usedId = track?.getSettings().deviceId ?? deviceId;
-    this.update({ deviceId: usedId ?? null });
+    const before = this.host.getSetup().deviceId;
+    // another camera is another view of the table: the dots the last one saw are no use to this one
+    this.update(before && usedId && usedId !== before ? { deviceId: usedId, dots: [] } : { deviceId: usedId ?? null });
     await this.listDevices(usedId ?? null);
     this.sayState();
   }
@@ -316,7 +375,9 @@ export class CameraPanel {
   }
 
   private update(patch: Partial<CameraSetup>): void {
-    const next = { ...this.host.getSetup(), ...patch };
+    // corners found again means the camera has moved, or the old clicks were off: either way the dots seen
+    // through the old map no longer belong with it
+    const next = { ...this.host.getSetup(), ...patch, ...(patch.corners !== undefined && !patch.dots ? { dots: [] } : {}) };
     this.host.setSetup(next);
     for (const b of this.zoomButtons) b.setAttribute('aria-pressed', String(b.id === `cam-zoom-${next.zoom}`));
     document.getElementById('cam-mirror')?.setAttribute('aria-pressed', String(next.mirror));

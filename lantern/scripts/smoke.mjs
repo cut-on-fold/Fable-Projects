@@ -35,6 +35,30 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const URL = `http://127.0.0.1:${server.address().port}/`;
 
+/** The entries of a zip whose files are stored uncompressed, read from its local headers in order. */
+function readStoredZip(buf) {
+  const entries = [];
+  let at = 0;
+  while (at + 30 <= buf.length && buf.readUInt32LE(at) === 0x04034b50) {
+    const method = buf.readUInt16LE(at + 8);
+    const size = buf.readUInt32LE(at + 18);
+    const nameLen = buf.readUInt16LE(at + 26);
+    const extraLen = buf.readUInt16LE(at + 28);
+    const name = buf.subarray(at + 30, at + 30 + nameLen).toString('utf8');
+    const start = at + 30 + nameLen + extraLen;
+    if (method !== 0) throw new Error(`${name} is compressed (method ${method})`);
+    entries.push({ name, data: buf.subarray(start, start + size) });
+    at = start + size;
+  }
+  return entries;
+}
+
+/** A PNG's size from its header, or null if it is not one. */
+function pngSize(data) {
+  if (data.length < 24 || data.readUInt32BE(0) !== 0x89504e47) return null;
+  return { w: data.readUInt32BE(16), h: data.readUInt32BE(20) };
+}
+
 /** A one-page A4 PDF with a thick black square and a diagonal, written by hand so no pattern file is needed. */
 export function makePdf() {
   const content = '8 w 0 0 0 RG 100 100 200 200 re S 100 700 m 495 400 l S BT /F1 36 Tf 120 600 Td (Lantern) Tj ET';
@@ -242,6 +266,38 @@ async function run(name, { dark }) {
   // What the camera saw is kept and saved as a picture.
   const [frames] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.click('#frames')]);
   if (!frames || frames.suggestedFilename() !== 'lantern-camera-frames.png') errors.push(`${name}: camera frames gave ${frames?.suggestedFilename()}`);
+  // Reference photos: the grid is projected and photographed, the page asks for the projector to go off, Enter
+  // takes the second photo, and one zip holds both pictures at the camera's size with the grid described.
+  await page.click('#cam-reference');
+  await page.waitForTimeout(300);
+  if (!(await page.isHidden('#bar'))) errors.push(`${name}: tools not hidden for the reference photos`);
+  if (!(await page.isHidden('#cam'))) errors.push(`${name}: camera window not hidden for the reference photos`);
+  if (!(await page.isHidden('#peek'))) errors.push(`${name}: Show tools button not hidden for the reference photos`);
+  const asked = await page.waitForFunction(() => /Grid photo taken/.test(document.getElementById('toast')?.textContent ?? '') && !document.getElementById('toast').hidden, null, { timeout: 15000 }).then(() => true, () => false);
+  if (!asked) errors.push(`${name}: the grid photo was not taken: ${await page.textContent('#toast')}`);
+  await page.screenshot({ path: join(SHOTS, `${name}-reference.png`) });
+  const [zipDownload] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }).catch(() => null), page.keyboard.press('Enter')]);
+  if (!zipDownload || !/^lantern-reference-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/.test(zipDownload.suggestedFilename())) errors.push(`${name}: reference photos gave ${zipDownload?.suggestedFilename()}`);
+  else {
+    const entries = readStoredZip(readFileSync(await zipDownload.path()));
+    const names = entries.map((e) => e.name);
+    if (names.join() !== 'grid.png,plain.png,grid.json') errors.push(`${name}: reference zip holds ${names}`);
+    for (const e of entries.filter((e) => e.name.endsWith('.png'))) {
+      const size = pngSize(e.data);
+      if (!size || size.w !== 640 || size.h !== 360) errors.push(`${name}: ${e.name} is ${JSON.stringify(size)}, not the camera's 640 × 360`);
+    }
+    const json = entries.find((e) => e.name === 'grid.json');
+    try {
+      const g = JSON.parse(new TextDecoder().decode(json.data));
+      if (g.grid.square_mm !== 10 || g.grid.squares_across !== 90 || g.grid.squares_down !== 60 || g.grid.line_x_mm.length !== 91) errors.push(`${name}: grid.json grid ${JSON.stringify(g.grid).slice(0, 200)}`);
+      if (g.camera.width_px !== 640 || g.camera.height_px !== 360 || g.camera.settings_identical !== true) errors.push(`${name}: grid.json camera ${JSON.stringify(g.camera)}`);
+      if (g.camera_to_table.corners?.length !== 4 || !Array.isArray(g.camera_to_table.table_mm_to_pixel) || g.camera_to_table.matched_points.length !== 0) errors.push(`${name}: grid.json map ${JSON.stringify(g.camera_to_table).slice(0, 300)}`);
+    } catch (e) {
+      errors.push(`${name}: grid.json ${e.message}`);
+    }
+  }
+  if (await page.isHidden('#bar')) errors.push(`${name}: tools not back after the reference photos`);
+  if (!/Saved lantern-reference/.test(await page.textContent('#toast'))) errors.push(`${name}: reference toast ${await page.textContent('#toast')}`);
   await page.click('#cam-close');
   if (await page.$('#cam')) errors.push(`${name}: camera window did not close`);
 

@@ -171,7 +171,9 @@ Grain-Nest. Each project lives in its own folder with its own README;
   `src/calc/placement.ts` where the page sits; `src/render.ts` draws through
   the mesh, `src/document.ts` opens PDFs and SVGs, `src/camera.ts` is the
   webcam window, `src/calc/vision.ts` finds the ring and dot in its picture,
-  `src/autocal.ts` moves the points from that, `src/main.ts` is the page. `calibration/card.mjs` is shared.
+  `src/autocal.ts` moves the points from that, `src/calc/reference.ts`
+  describes the grid and the camera map for the reference photos,
+  `src/zip.ts` packs them, `src/main.ts` is the page. `calibration/card.mjs` is shared.
   `scripts/smoke.mjs` clicks through the built page in headless Chromium.
 - `calibration/` — `card.mjs` draws a calibration card; `make.mjs` writes the
   SVG test cards in `cards/`; CI checks the committed cards match the script.

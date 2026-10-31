@@ -7,9 +7,11 @@ import {
 import { centred, flippedAcross, flippedDown, moved, pageCorners, parsePlacement, rotated, tableToPage, type PageSize, type Placement } from './calc/placement';
 import { openFile, type Opened } from './document';
 import { card } from '../../calibration/card.mjs';
-import { CameraPanel, defaultCameraSetup, parseCameraSetup, type CameraSetup } from './camera';
+import { CameraPanel, defaultCameraSetup, parseCameraSetup, withDot, type CameraSetup } from './camera';
 import { autoCalibrate, RING_INNER, RING_OUTER, summarise, type AutoHost, type Diagnostic } from './autocal';
 import { orangeScore } from './calc/vision';
+import { referenceJson } from './calc/reference';
+import { zipStored } from './zip';
 import { Renderer } from './render';
 import { CM_PER_IN, formatLength, inputText, parseLength, type Unit } from './units';
 
@@ -156,6 +158,13 @@ let autoText = '';
 let autoSummary: string | null = null;
 /** What the camera saw at the last points set, newest last, for the Camera frames picture. */
 let autoDiagnostics: Diagnostic[] = [];
+/** Reference photos in progress: the grid showing, waiting for the projector to be turned off, or the dark second shot. */
+interface Reference {
+  stage: 'grid' | 'ask' | 'dark';
+  cancel: boolean;
+  confirm: (() => void) | null;
+}
+let reference: Reference | null = null;
 let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number; alone: boolean } | { kind: 'pattern'; last: Pt } | null = null;
 let meshDirty = true;
 
@@ -256,6 +265,7 @@ function buildBar(): void {
       widthBox.setAttribute('aria-invalid', String(!(w && w > 0)));
       heightBox.setAttribute('aria-invalid', String(!(h && h > 0)));
       if (w && h && w > 0 && h > 0 && (w !== mesh().width || h !== mesh().height)) {
+        cal().camera = { ...cal().camera, dots: [] }; // the crossings are somewhere else on a table of another size
         setMesh(withSize(mesh(), w, h));
         selected = { i: 0, j: 0 };
         refreshSpacing();
@@ -514,9 +524,11 @@ function toggleCamera(): void {
     },
     onClose: () => {
       cameraPanel = null;
+      cancelReference();
       document.getElementById('camera')?.setAttribute('aria-pressed', 'false');
       refreshAutoButton();
     },
+    onReference: () => void runReference(),
   });
   cameraPanel = panel;
   app.append(panel.root);
@@ -569,6 +581,11 @@ async function runAuto(points: Array<{ i: number; j: number }>): Promise<void> {
     record: (d) => {
       autoDiagnostics.push(d);
       if (autoDiagnostics.length > 12) autoDiagnostics.shift();
+      // a point set is a dot seen at a known table crossing: kept for the reference photos' list of matches
+      if (d.outcome.ok && d.dot) {
+        cal().camera = withDot(cal().camera, { table: tablePointAt(mesh(), d.i, d.j), pixel: { x: d.dot.x + d.roi.x, y: d.dot.y + d.roi.y }, gap: d.outcome.gap });
+        save();
+      }
     },
     showRing: async (p) => {
       autoRing = p;
@@ -712,8 +729,110 @@ function saveDiagnostics(): void {
   }, 'image/png');
 }
 
+/** Hand the browser a file to save. */
+function download(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const REFERENCE_SETTLE_MS = 2100; // the projector and the camera catching up with the grid: three of Auto's settles
+const REFERENCE_DARK_MS = 3000; // after the word to go: the projector's lamp fading and the camera settling on the dark table
+
+function cancelReference(): void {
+  if (!reference) return;
+  reference.cancel = true;
+  reference.confirm?.();
+}
+
+/**
+ * Two photos for work outside Lantern: the table with the grid projected, then the same table with the
+ * projector off, from the same running camera, saved full size with a file saying what the grid is and where
+ * the table sits in the picture. The tools and the camera window go while the photos are taken, so nothing but
+ * the grid is projected.
+ */
+async function runReference(): Promise<void> {
+  if (reference || autoRun || !cameraPanel) return;
+  const panel = cameraPanel;
+  if (!panel.pictureSize()) {
+    showToast('The camera has no picture yet.');
+    return;
+  }
+  const ref: Reference = { stage: 'grid', cancel: false, confirm: null };
+  reference = ref;
+  const barWasHidden = state.barHidden;
+  setBarHidden(true);
+  panel.setHidden(true);
+  popOpen = null;
+  renderPop();
+  const twoFrames = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  try {
+    redraw();
+    await twoFrames();
+    await wait(REFERENCE_SETTLE_MS);
+    if (ref.cancel) return;
+    const grid = await panel.photo();
+    if (ref.cancel) return;
+    if (!grid) throw new Error('the camera gave no picture');
+    ref.stage = 'ask';
+    redraw();
+    showToast('Grid photo taken. Turn the projector off, then press Enter or click: the second photo follows three seconds later. Esc cancels.', 0);
+    await new Promise<void>((resolve) => (ref.confirm = resolve));
+    if (ref.cancel) return;
+    ref.stage = 'dark';
+    redraw();
+    toast.hidden = true;
+    await twoFrames();
+    await wait(REFERENCE_DARK_MS);
+    if (ref.cancel) return;
+    const plain = await panel.photo();
+    if (ref.cancel) return;
+    if (!plain) throw new Error('the camera gave no picture');
+    const m = mesh();
+    const taken = new Date();
+    const json = referenceJson({
+      version: __LANTERN_VERSION__,
+      taken: taken.toISOString(),
+      table: { name: cal().name, width: m.width, height: m.height },
+      unit: state.unit,
+      stepCm: state.unit === 'in' ? CM_PER_IN : 1,
+      heavyCm: state.unit === 'in' ? 12 * CM_PER_IN : 10,
+      camera: { label: typeof grid.settings.label === 'string' ? grid.settings.label : null, width: grid.width, height: grid.height, gridSettings: grid.settings, plainSettings: plain.settings },
+      corners: cal().camera.corners,
+      dots: cal().camera.dots,
+    });
+    const enc = new TextEncoder();
+    const zip = zipStored(
+      [
+        { name: 'grid.png', data: new Uint8Array(await grid.blob.arrayBuffer()) },
+        { name: 'plain.png', data: new Uint8Array(await plain.blob.arrayBuffer()) },
+        { name: 'grid.json', data: enc.encode(JSON.stringify(json, null, 2) + '\n') },
+      ],
+      taken,
+    );
+    const stamp = `${taken.getFullYear()}-${String(taken.getMonth() + 1).padStart(2, '0')}-${String(taken.getDate()).padStart(2, '0')}-${String(taken.getHours()).padStart(2, '0')}${String(taken.getMinutes()).padStart(2, '0')}`;
+    const name = `lantern-reference-${stamp}.zip`;
+    download(new Blob([zip as BlobPart], { type: 'application/zip' }), name);
+    const dots = cal().camera.dots.length;
+    showToast(`Saved ${name}: grid.png and plain.png at ${grid.width} × ${grid.height}, with grid.json${dots ? ` (${dots} measured dots)` : ' (no measured dots: run Auto first for those)'}. The projector can go back on.`, 0);
+  } catch (e) {
+    showToast(`Reference photos stopped: ${(e as Error).message}`);
+  } finally {
+    if (ref.cancel) toast.hidden = true;
+    reference = null;
+    panel.setHidden(false);
+    setBarHidden(barWasHidden);
+    redraw();
+  }
+}
+
 function setMode(mode: State['mode']): void {
   if (autoRun) autoRun.stop = true;
+  cancelReference();
   if (mode !== 'calibrate') cameraPanel?.close();
   state.mode = mode;
   popOpen = null;
@@ -749,8 +868,9 @@ function setWeight(w: number): void {
 function setBarHidden(hidden: boolean): void {
   state.barHidden = hidden;
   bar.hidden = hidden;
-  // while Auto runs nothing but the ring is drawn: no Show tools button to land in the camera's picture
-  peek.hidden = !hidden || !!autoRun;
+  // while Auto runs nothing but the ring is drawn, and while the reference photos are taken nothing but the
+  // grid: no Show tools button to land in the camera's picture
+  peek.hidden = !hidden || !!autoRun || !!reference;
   if (hidden) {
     popOpen = null;
     renderPop();
@@ -886,7 +1006,7 @@ function draw(): void {
   const dpr = window.devicePixelRatio || 1;
   const m = mesh();
   stage.classList.toggle('inverted', state.invert);
-  stage.classList.toggle('auto', !!autoRun);
+  stage.classList.toggle('auto', !!autoRun || !!reference);
   stage.classList.toggle('mode-calibrate', state.mode === 'calibrate');
   stage.classList.toggle('mode-project', state.mode === 'project');
 
@@ -896,7 +1016,7 @@ function draw(): void {
       renderer.setMesh(triangulate(m, 8));
       meshDirty = false;
     }
-    const showPage = state.mode === 'project' && !!doc && !!pageSize && !!pageCanvas && !!state.placement;
+    const showPage = state.mode === 'project' && !!doc && !!pageSize && !!pageCanvas && !!state.placement && !reference;
     renderer.draw(W, H, {
       show: showPage,
       tableToPage: showPage ? tableToPage(state.placement!, pageSize!) : [1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -911,6 +1031,10 @@ function draw(): void {
   const ctx = overlayCtx;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  if (reference) {
+    drawReference(ctx, m, W, H);
+    return;
+  }
   if (autoRun) {
     // A white table with nothing on it but the ring at the point being set, and a word of progress in the
     // corner of the screen furthest from it, where it cannot get into the camera's picture of the ring.
@@ -1070,6 +1194,46 @@ function draw(): void {
   }
 }
 
+/**
+ * The screen while the reference photos are taken: the grid alone, black on white, every unit through the
+ * calibration with a heavier line every 10 cm or 12 in, and nothing else that could get into the picture;
+ * then the word to turn the projector off, in the middle where it is read from the table; then black.
+ */
+function drawReference(ctx: CanvasRenderingContext2D, m: Mesh, W: number, H: number): void {
+  if (!reference) return;
+  if (reference.stage === 'dark') {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  const step = state.unit === 'in' ? CM_PER_IN : 1;
+  const heavyEvery = state.unit === 'in' ? 12 * CM_PER_IN : 10;
+  ctx.strokeStyle = '#000';
+  ctx.lineCap = 'butt';
+  for (const line of gridLines(m, step)) {
+    ctx.lineWidth = Math.abs(line.at / heavyEvery - Math.round(line.at / heavyEvery)) < 1e-6 ? 3 : 2;
+    ctx.beginPath();
+    line.points.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+  }
+  if (reference.stage === 'ask') {
+    const lines = ['Grid photo taken.', 'Turn the projector off, then press Enter or click.', 'The second photo follows three seconds later. Esc cancels.'];
+    ctx.font = '26px Atkinson Hyperlegible, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = Math.max(...lines.map((t) => ctx.measureText(t).width)) + 60;
+    const height = lines.length * 40 + 40;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(W / 2 - width / 2, H / 2 - height / 2, width, height);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(W / 2 - width / 2, H / 2 - height / 2, width, height);
+    ctx.fillStyle = '#000';
+    lines.forEach((t, k) => ctx.fillText(t, W / 2, H / 2 - height / 2 + 40 + k * 40));
+    ctx.textAlign = 'left';
+  }
+}
+
 // ---------- pointer and keys
 
 /** How close a press has to be to a circle to pick it up, in CSS px: generous for a trackpad or a finger. */
@@ -1077,6 +1241,11 @@ const HANDLE_RADIUS = 28;
 
 stage.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 && e.pointerType === 'mouse') return;
+  if (reference) {
+    // a click anywhere is the word that the projector is off
+    if (reference.stage === 'ask') reference.confirm?.();
+    return;
+  }
   const p = { x: e.clientX, y: e.clientY };
   if (state.mode === 'calibrate') {
     const hit = nearestPoint(mesh(), p, HANDLE_RADIUS);
@@ -1136,6 +1305,13 @@ window.addEventListener('keydown', (e) => {
   if (typing) return;
   if (e.metaKey || e.ctrlKey) return;
   const key = e.key;
+  if (reference) {
+    // while the photos are taken only two keys mean anything: the word to go on, and stop
+    if (key === 'Escape') cancelReference();
+    else if (reference.stage === 'ask' && (key === 'Enter' || key === ' ')) reference.confirm?.();
+    e.preventDefault();
+    return;
+  }
   const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   if (key in arrows) {
     const [dx, dy] = arrows[key]!;

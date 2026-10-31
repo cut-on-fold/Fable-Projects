@@ -67,7 +67,34 @@ projected cross sits on the mat line in the picture, next point. The window
 can be dragged and resized, the picture turned, mirrored and zoomed 1× to
 8×, and a click in it looks somewhere else until the selection changes.
 **Snapshot** saves the whole picture as the camera sees it, to check the
-projection from the chair or to send. The
+projection from the chair or to send.
+
+**Reference** takes two photos for work outside Lantern. It clears the
+screen to the calibration grid alone, black lines on white every centimetre
+or inch through the calibration (heavier every 10 cm or 12 in), waits a
+couple of seconds for the projector and the camera to catch up, and saves
+the camera's picture; then it asks you to turn the projector off (or blank
+it) and press `Enter` or click, and three seconds later saves a second
+picture from the same running camera, nothing restarted or adjusted between
+the two. Both are the camera's full frame (3840 × 2160 from a 4K webcam) as
+PNGs, not turned, mirrored, cropped or scaled, and the download is one zip,
+`lantern-reference-<date>-<time>.zip`, that unpacks to a folder holding
+`grid.png`, `plain.png` and `grid.json`. The JSON says what the grid is in
+millimetres on the table (the square, how many across and down, the
+position of every line, and that (0, 0) is the table's top-left corner as
+projected), the camera's settings at each photo, where the table's four
+corners sit in the picture from your Find-corners clicks with the flat map
+fitted through them both ways, and the dots Auto found at the crossings
+(table mm → camera pixel), which are the precise matches; Lantern applies
+no lens correction to the camera, and the file says so. Every number has a
+note beside it saying what it means. Run Auto before Reference to have the
+measured dots in the file; they are forgotten when the corners are found
+again, another camera is chosen or the table's size changes, since any of
+those means the dots are somewhere else in the picture. The second photo is
+taken blind if Lantern is on the projector's screen, so the result shows
+when the projector is back on. With auto exposure left on, the camera will
+re-expose for the dark table between the two photos; the settings above
+keep it fixed. `Esc` cancels at any point. The
 camera needs the page served over https (the Pages site) or from localhost,
 not opened as a saved file. It asks the camera for the biggest picture it
 offers, up to 4K, and says the size it got when it opens: a phone over
