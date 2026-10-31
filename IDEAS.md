@@ -71,6 +71,12 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.19** — **Reference** in the camera window: a full-size
+      photo of the table with the grid projected, then, after the word that
+      the projector is off, a second from the same camera settings, saved as
+      one zip (`grid.png`, `plain.png`, `grid.json`) that says what the grid
+      is in millimetres, where the table's corners sit in the picture and
+      which dots Auto measured where, for work outside Lantern.
 - [x] **Lantern v0.4.18** — other projection calibration software is named
       generally rather than by one product, in the Save card tip, the code
       comments, the landing page and the ideas list; the Thanks section in
