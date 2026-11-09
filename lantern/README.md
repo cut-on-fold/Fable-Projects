@@ -97,7 +97,7 @@ those means the dots are somewhere else in the picture. `Esc` cancels at
 any point. The
 camera needs the page served over https (the Pages site) or from localhost,
 not opened as a saved file. It asks the camera for the biggest picture it
-offers, up to 4K, and says the size it got when it opens: a phone over
+offers, up to 4K, and the status line under the picture says the size it got: a phone over
 Continuity Camera gives 1080p, a 4K webcam four times the pixels, and
 Auto's seeing is the finer for every one of them. The camera is never
 measured: it only decides where to zoom, and your eye does the aligning.
