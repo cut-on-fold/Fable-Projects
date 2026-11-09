@@ -73,10 +73,12 @@ projection from the chair or to send.
 screen to the calibration grid alone, black lines on white every centimetre
 or inch through the calibration (heavier every 10 cm or 12 in), waits a
 couple of seconds for the projector and the camera to catch up, and saves
-the camera's picture; then it asks you to turn the projector off (or blank
-it) and press `Enter` or click, and three seconds later saves a second
-picture from the same running camera, nothing restarted or adjusted between
-the two. Both are the camera's full frame (3840 × 2160 from a 4K webcam) as
+the camera's picture; then it clears the screen to plain white, the light
+Auto works in, waits the same again and saves a second picture from the
+same running camera, nothing restarted or adjusted between the two. (With
+the projector off the table is too dark for the camera's fixed settings,
+and with the room lights on too bright, so the plain picture is taken under
+the projector's white.) Both are the camera's full frame (3840 × 2160 from a 4K webcam) as
 PNGs, not turned, mirrored, cropped or scaled, and the download is one zip,
 `lantern-reference-<date>-<time>.zip`, that unpacks to a folder holding
 `grid.png`, `plain.png` and `grid.json`. The JSON says what the grid is in
@@ -90,11 +92,8 @@ no lens correction to the camera, and the file says so. Every number has a
 note beside it saying what it means. Run Auto before Reference to have the
 measured dots in the file; they are forgotten when the corners are found
 again, another camera is chosen or the table's size changes, since any of
-those means the dots are somewhere else in the picture. The second photo is
-taken blind if Lantern is on the projector's screen, so the result shows
-when the projector is back on. With auto exposure left on, the camera will
-re-expose for the dark table between the two photos; the settings above
-keep it fixed. `Esc` cancels at any point. The
+those means the dots are somewhere else in the picture. `Esc` cancels at
+any point. The
 camera needs the page served over https (the Pages site) or from localhost,
 not opened as a saved file. It asks the camera for the biggest picture it
 offers, up to 4K, and says the size it got when it opens: a phone over

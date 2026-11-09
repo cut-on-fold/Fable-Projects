@@ -71,6 +71,11 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.20** — Reference takes its second photo under a plain
+      white screen, straight after the first, instead of asking for the
+      projector to be turned off: with the projector off the table was too
+      dark for the camera's fixed settings, with the room lights on too
+      bright.
 - [x] **Lantern v0.4.19** — **Reference** in the camera window: a full-size
       photo of the table with the grid projected, then, after the word that
       the projector is off, a second from the same camera settings, saved as
