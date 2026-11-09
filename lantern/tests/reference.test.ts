@@ -45,6 +45,7 @@ describe('referenceJson', () => {
     expect(j.grid.line_y_mm).toHaveLength(61);
     expect(j.grid.line_x_mm[90]).toBe(900);
     expect(j.about).toMatch(/3840 × 2160/);
+    expect(j.about).toMatch(/plain white screen/);
     expect(j.camera.settings_identical).toBe(true);
   });
 

@@ -158,11 +158,10 @@ let autoText = '';
 let autoSummary: string | null = null;
 /** What the camera saw at the last points set, newest last, for the Camera frames picture. */
 let autoDiagnostics: Diagnostic[] = [];
-/** Reference photos in progress: the grid showing, waiting for the projector to be turned off, or the dark second shot. */
+/** Reference photos in progress: the grid showing for the first, then the plain white screen for the second. */
 interface Reference {
-  stage: 'grid' | 'ask' | 'dark';
+  stage: 'grid' | 'plain';
   cancel: boolean;
-  confirm: (() => void) | null;
 }
 let reference: Reference | null = null;
 let dragging: { kind: 'point'; i: number; j: number; dx: number; dy: number; alone: boolean } | { kind: 'pattern'; last: Pt } | null = null;
@@ -739,20 +738,18 @@ function download(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-const REFERENCE_SETTLE_MS = 2100; // the projector and the camera catching up with the grid: three of Auto's settles
-const REFERENCE_DARK_MS = 3000; // after the word to go: the projector's lamp fading and the camera settling on the dark table
+const REFERENCE_SETTLE_MS = 2100; // the projector and the camera catching up with each screen: three of Auto's settles
 
 function cancelReference(): void {
-  if (!reference) return;
-  reference.cancel = true;
-  reference.confirm?.();
+  if (reference) reference.cancel = true;
 }
 
 /**
- * Two photos for work outside Lantern: the table with the grid projected, then the same table with the
- * projector off, from the same running camera, saved full size with a file saying what the grid is and where
- * the table sits in the picture. The tools and the camera window go while the photos are taken, so nothing but
- * the grid is projected.
+ * Two photos for work outside Lantern: the table with the grid projected, then the same table under a plain
+ * white screen (the light Auto works in: the projector off leaves the table too dark for the camera's fixed
+ * settings, the room lights on too bright), from the same running camera, saved full size with a file saying
+ * what the grid is and where the table sits in the picture. The tools and the camera window go while the photos
+ * are taken, so nothing but the grid, then nothing at all, is projected.
  */
 async function runReference(): Promise<void> {
   if (reference || autoRun || !cameraPanel) return;
@@ -761,7 +758,7 @@ async function runReference(): Promise<void> {
     showToast('The camera has no picture yet.');
     return;
   }
-  const ref: Reference = { stage: 'grid', cancel: false, confirm: null };
+  const ref: Reference = { stage: 'grid', cancel: false };
   reference = ref;
   const barWasHidden = state.barHidden;
   setBarHidden(true);
@@ -778,16 +775,10 @@ async function runReference(): Promise<void> {
     const grid = await panel.photo();
     if (ref.cancel) return;
     if (!grid) throw new Error('the camera gave no picture');
-    ref.stage = 'ask';
+    ref.stage = 'plain';
     redraw();
-    showToast('Grid photo taken. Turn the projector off, then press Enter or click: the second photo follows three seconds later. Esc cancels.', 0);
-    await new Promise<void>((resolve) => (ref.confirm = resolve));
-    if (ref.cancel) return;
-    ref.stage = 'dark';
-    redraw();
-    toast.hidden = true;
     await twoFrames();
-    await wait(REFERENCE_DARK_MS);
+    await wait(REFERENCE_SETTLE_MS);
     if (ref.cancel) return;
     const plain = await panel.photo();
     if (ref.cancel) return;
@@ -818,11 +809,10 @@ async function runReference(): Promise<void> {
     const name = `lantern-reference-${stamp}.zip`;
     download(new Blob([zip as BlobPart], { type: 'application/zip' }), name);
     const dots = cal().camera.dots.length;
-    showToast(`Saved ${name}: grid.png and plain.png at ${grid.width} × ${grid.height}, with grid.json${dots ? ` (${dots} measured dots)` : ' (no measured dots: run Auto first for those)'}. The projector can go back on.`, 0);
+    showToast(`Saved ${name}: grid.png and plain.png at ${grid.width} × ${grid.height}, with grid.json${dots ? ` (${dots} measured dots)` : ' (no measured dots: run Auto first for those)'}.`, 0);
   } catch (e) {
     showToast(`Reference photos stopped: ${(e as Error).message}`);
   } finally {
-    if (ref.cancel) toast.hidden = true;
     reference = null;
     panel.setHidden(false);
     setBarHidden(barWasHidden);
@@ -1032,7 +1022,7 @@ function draw(): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (reference) {
-    drawReference(ctx, m, W, H);
+    drawReference(ctx, m);
     return;
   }
   if (autoRun) {
@@ -1197,15 +1187,10 @@ function draw(): void {
 /**
  * The screen while the reference photos are taken: the grid alone, black on white, every unit through the
  * calibration with a heavier line every 10 cm or 12 in, and nothing else that could get into the picture;
- * then the word to turn the projector off, in the middle where it is read from the table; then black.
+ * then the white screen with nothing on it at all.
  */
-function drawReference(ctx: CanvasRenderingContext2D, m: Mesh, W: number, H: number): void {
-  if (!reference) return;
-  if (reference.stage === 'dark') {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
-    return;
-  }
+function drawReference(ctx: CanvasRenderingContext2D, m: Mesh): void {
+  if (!reference || reference.stage === 'plain') return;
   const step = state.unit === 'in' ? CM_PER_IN : 1;
   const heavyEvery = state.unit === 'in' ? 12 * CM_PER_IN : 10;
   ctx.strokeStyle = '#000';
@@ -1216,22 +1201,6 @@ function drawReference(ctx: CanvasRenderingContext2D, m: Mesh, W: number, H: num
     line.points.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
     ctx.stroke();
   }
-  if (reference.stage === 'ask') {
-    const lines = ['Grid photo taken.', 'Turn the projector off, then press Enter or click.', 'The second photo follows three seconds later. Esc cancels.'];
-    ctx.font = '26px Atkinson Hyperlegible, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const width = Math.max(...lines.map((t) => ctx.measureText(t).width)) + 60;
-    const height = lines.length * 40 + 40;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(W / 2 - width / 2, H / 2 - height / 2, width, height);
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(W / 2 - width / 2, H / 2 - height / 2, width, height);
-    ctx.fillStyle = '#000';
-    lines.forEach((t, k) => ctx.fillText(t, W / 2, H / 2 - height / 2 + 40 + k * 40));
-    ctx.textAlign = 'left';
-  }
 }
 
 // ---------- pointer and keys
@@ -1241,11 +1210,7 @@ const HANDLE_RADIUS = 28;
 
 stage.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 && e.pointerType === 'mouse') return;
-  if (reference) {
-    // a click anywhere is the word that the projector is off
-    if (reference.stage === 'ask') reference.confirm?.();
-    return;
-  }
+  if (reference) return; // nothing to pick up while the photos are taken
   const p = { x: e.clientX, y: e.clientY };
   if (state.mode === 'calibrate') {
     const hit = nearestPoint(mesh(), p, HANDLE_RADIUS);
@@ -1306,9 +1271,8 @@ window.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey) return;
   const key = e.key;
   if (reference) {
-    // while the photos are taken only two keys mean anything: the word to go on, and stop
+    // while the photos are taken only Esc means anything: stop
     if (key === 'Escape') cancelReference();
-    else if (reference.stage === 'ask' && (key === 'Enter' || key === ' ')) reference.confirm?.();
     e.preventDefault();
     return;
   }

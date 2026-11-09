@@ -266,17 +266,16 @@ async function run(name, { dark }) {
   // What the camera saw is kept and saved as a picture.
   const [frames] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.click('#frames')]);
   if (!frames || frames.suggestedFilename() !== 'lantern-camera-frames.png') errors.push(`${name}: camera frames gave ${frames?.suggestedFilename()}`);
-  // Reference photos: the grid is projected and photographed, the page asks for the projector to go off, Enter
-  // takes the second photo, and one zip holds both pictures at the camera's size with the grid described.
+  // Reference photos: the grid is projected and photographed, then a plain white screen, and one zip holds
+  // both pictures at the camera's size with the grid described.
+  const zipWait = page.waitForEvent('download', { timeout: 25000 }).catch(() => null);
   await page.click('#cam-reference');
   await page.waitForTimeout(300);
   if (!(await page.isHidden('#bar'))) errors.push(`${name}: tools not hidden for the reference photos`);
   if (!(await page.isHidden('#cam'))) errors.push(`${name}: camera window not hidden for the reference photos`);
   if (!(await page.isHidden('#peek'))) errors.push(`${name}: Show tools button not hidden for the reference photos`);
-  const asked = await page.waitForFunction(() => /Grid photo taken/.test(document.getElementById('toast')?.textContent ?? '') && !document.getElementById('toast').hidden, null, { timeout: 15000 }).then(() => true, () => false);
-  if (!asked) errors.push(`${name}: the grid photo was not taken: ${await page.textContent('#toast')}`);
   await page.screenshot({ path: join(SHOTS, `${name}-reference.png`) });
-  const [zipDownload] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }).catch(() => null), page.keyboard.press('Enter')]);
+  const zipDownload = await zipWait;
   if (!zipDownload || !/^lantern-reference-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/.test(zipDownload.suggestedFilename())) errors.push(`${name}: reference photos gave ${zipDownload?.suggestedFilename()}`);
   else {
     const entries = readStoredZip(readFileSync(await zipDownload.path()));
