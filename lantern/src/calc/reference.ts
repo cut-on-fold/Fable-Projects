@@ -85,7 +85,7 @@ export function referenceJson(input: ReferenceInput): Record<string, unknown> {
 
   return {
     about:
-      `Reference photos from Lantern v${input.version}. grid.png is the camera's picture with Lantern's grid projected on the table; plain.png is the same picture taken a few seconds later with the projector showing a plain white screen, so the table is lit the same way with nothing drawn on it. Both are the camera's frames as they came, ${camera.width} × ${camera.height} pixels, not turned, mirrored, cropped or scaled. Pixel (0, 0) is the top-left of each picture, x runs right and y runs down, and a pixel's position is its centre. Lengths on the table are in millimetres.`,
+      `Reference photos from Lantern v${input.version}. grid.png is the camera's picture with Lantern's grid projected on the table; plain.png is the same picture taken a few seconds later with the projector showing a plain mid-grey screen (sRGB #808080, about a quarter of the white's light), so the table is lit evenly with nothing drawn on it and nothing washed out. Both are the camera's frames as they came, ${camera.width} × ${camera.height} pixels, not turned, mirrored, cropped or scaled. Pixel (0, 0) is the top-left of each picture, x runs right and y runs down, and a pixel's position is its centre. Lengths on the table are in millimetres.`,
     taken: input.taken,
     lantern_version: input.version,
     table: {
@@ -114,7 +114,7 @@ export function referenceJson(input: ReferenceInput): Record<string, unknown> {
       settings_for_grid_photo: camera.gridSettings,
       settings_for_plain_photo: camera.plainSettings,
       settings_identical: same,
-      note: 'The settings are what the browser reports for the camera at each photo (MediaStreamTrack.getSettings()). Both photos come from the same running camera stream, which Lantern did not restart or adjust between them, under the same projector light (the grid, then plain white); exposure, focus and white balance are whatever the camera or its own software holds them at.',
+      note: 'The settings are what the browser reports for the camera at each photo (MediaStreamTrack.getSettings()). Both photos come from the same running camera stream, which Lantern did not restart or adjust between them, under the projector\'s light each time (black lines on white for the grid, then plain mid grey); exposure, focus and white balance are whatever the camera or its own software holds them at.',
     },
     camera_to_table: {
       note: 'Lantern\'s camera is only ever mapped roughly: the four corners of the table are clicked by eye in the camera picture and a single homography (a flat-plane map) is fitted through them. That map is below. It assumes a flat table and an ideal lens, so it is a starting point, good to a few camera pixels; the dots Auto measured, listed under matched_points, are the precise matches.',

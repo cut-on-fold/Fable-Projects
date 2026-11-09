@@ -71,6 +71,9 @@ like to know:
 
 ## Shipped
 
+- [x] **Lantern v0.4.21** — Reference's plain photo is taken under a mid
+      grey screen rather than white, which washed out the middle of what was
+      on the table; the file says which grey.
 - [x] **Lantern v0.4.20** — Reference takes its second photo under a plain
       white screen, straight after the first, instead of asking for the
       projector to be turned off: with the projector off the table was too

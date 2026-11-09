@@ -403,8 +403,8 @@ export class CameraPanel {
     const size = this.pictureSize();
     const px = size ? ` (${size.w} × ${size.h} px)` : '';
     if (!s.corners) this.say(`Showing the whole picture${px}. Find corners lets the view follow the selected point; a click looks there instead.${sel ? ` Selected: ${sel.label}.` : ''}`);
-    else if (this.manualCentre) this.say(`Looking where you clicked. Select another point to follow it again.`);
-    else this.say(sel ? `Following ${sel.label}. Arrow keys nudge it; Tab picks the next along the row, Shift+Tab down.` : 'Select a point to follow it.');
+    else if (this.manualCentre) this.say(`Looking where you clicked${px}. Select another point to follow it again.`);
+    else this.say(sel ? `Following ${sel.label}${px}. Arrow keys nudge it; Tab picks the next along the row, Shift+Tab down.` : `Select a point to follow it${px}.`);
   }
 
   /** The map from video pixels to the canvas's CSS pixels. */
