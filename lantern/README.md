@@ -73,12 +73,13 @@ projection from the chair or to send.
 screen to the calibration grid alone, black lines on white every centimetre
 or inch through the calibration (heavier every 10 cm or 12 in), waits a
 couple of seconds for the projector and the camera to catch up, and saves
-the camera's picture; then it clears the screen to plain white, the light
-Auto works in, waits the same again and saves a second picture from the
-same running camera, nothing restarted or adjusted between the two. (With
-the projector off the table is too dark for the camera's fixed settings,
-and with the room lights on too bright, so the plain picture is taken under
-the projector's white.) Both are the camera's full frame (3840 × 2160 from a 4K webcam) as
+the camera's picture; then it clears the screen to a plain mid grey, waits
+the same again and saves a second picture from the same running camera,
+nothing restarted or adjusted between the two. (With the projector off the
+table is too dark for the camera's fixed settings, with the room lights on
+too bright, and under the projector's white the middle of whatever is on
+the table washed out; mid grey puts about a quarter of the white's light
+on it.) Both are the camera's full frame (3840 × 2160 from a 4K webcam) as
 PNGs, not turned, mirrored, cropped or scaled, and the download is one zip,
 `lantern-reference-<date>-<time>.zip`, that unpacks to a folder holding
 `grid.png`, `plain.png` and `grid.json`. The JSON says what the grid is in

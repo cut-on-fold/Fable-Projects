@@ -158,7 +158,7 @@ let autoText = '';
 let autoSummary: string | null = null;
 /** What the camera saw at the last points set, newest last, for the Camera frames picture. */
 let autoDiagnostics: Diagnostic[] = [];
-/** Reference photos in progress: the grid showing for the first, then the plain white screen for the second. */
+/** Reference photos in progress: the grid showing for the first, then the plain grey screen for the second. */
 interface Reference {
   stage: 'grid' | 'plain';
   cancel: boolean;
@@ -746,8 +746,8 @@ function cancelReference(): void {
 
 /**
  * Two photos for work outside Lantern: the table with the grid projected, then the same table under a plain
- * white screen (the light Auto works in: the projector off leaves the table too dark for the camera's fixed
- * settings, the room lights on too bright), from the same running camera, saved full size with a file saying
+ * mid-grey screen (the projector off leaves the table too dark for the camera's fixed settings, the room
+ * lights on too bright, and white washed out the middle), from the same running camera, saved full size with a file saying
  * what the grid is and where the table sits in the picture. The tools and the camera window go while the photos
  * are taken, so nothing but the grid, then nothing at all, is projected.
  */
@@ -1022,7 +1022,7 @@ function draw(): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (reference) {
-    drawReference(ctx, m);
+    drawReference(ctx, m, W, H);
     return;
   }
   if (autoRun) {
@@ -1187,10 +1187,19 @@ function draw(): void {
 /**
  * The screen while the reference photos are taken: the grid alone, black on white, every unit through the
  * calibration with a heavier line every 10 cm or 12 in, and nothing else that could get into the picture;
- * then the white screen with nothing on it at all.
+ * then a plain mid-grey screen with nothing on it at all. Grey rather than white because white, under the
+ * camera's fixed exposure, washed out the middle of what was on the table; mid grey puts about a quarter of
+ * the light there, two stops less, still well clear of too dark.
  */
-function drawReference(ctx: CanvasRenderingContext2D, m: Mesh): void {
-  if (!reference || reference.stage === 'plain') return;
+const REFERENCE_PLAIN = '#808080';
+
+function drawReference(ctx: CanvasRenderingContext2D, m: Mesh, W: number, H: number): void {
+  if (!reference) return;
+  if (reference.stage === 'plain') {
+    ctx.fillStyle = REFERENCE_PLAIN;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
   const step = state.unit === 'in' ? CM_PER_IN : 1;
   const heavyEvery = state.unit === 'in' ? 12 * CM_PER_IN : 10;
   ctx.strokeStyle = '#000';
